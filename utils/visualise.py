@@ -1,7 +1,12 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import cv2
 import yaml
-import sys
 from core.detector import ObjectDetector
+
+
 
 def visualise(video_path, output_path="data/annotated_output.mp4"):
     with open("config/settings.yaml") as f:
