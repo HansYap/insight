@@ -1,0 +1,52 @@
+# config/settings.yaml
+
+system:
+  name: "insight-vision"
+  version: "0.1.0"
+  log_level: "INFO"
+
+camera:
+  source: 0                    # 0 = first USB webcam, or "/dev/video0"
+  width: 640
+  height: 480
+  fps_target: 15               # Request this from webcam, don't expect it
+  buffer_size: 1               # Critical: set to 1 to prevent frame lag
+
+models:
+  yolo:
+    path: "models/yolov8n.pt"
+    confidence_threshold: 0.45
+    iou_threshold: 0.45
+    device: "cpu"
+    imgsz: 320                 # Start at 320 — faster than 640 on Pi
+
+  florence2:
+    path: "models/florence2"
+    enabled: false             # Phase 2
+    load_on_demand: true
+    unload_after_seconds: 30
+
+  sam2:
+    path: "models/sam2"
+    enabled: false             # Phase 3
+    load_on_demand: true
+
+detection:
+  trigger_classes:             # Only these trigger Florence-2 later
+    - person
+    - gym bag
+    - dog
+    - camera
+    - laptop
+    - phone
+  min_confidence: 0.5
+  cooldown_seconds: 5          # Don't re-trigger within 5s of last event
+
+database:
+  path: "data/insight.db"
+  log_detections: true
+  log_fps_interval: 60         # Log system stats every 60s
+
+scene:
+  active: "default"
+  roi_enabled: false           # Region of interest masking — Phase 1.5
