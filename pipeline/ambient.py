@@ -15,7 +15,7 @@ def load_config(path="config/settings.yaml"):
         return yaml.safe_load(f)
 
 
-def run(source=None):
+def run(source=None, loop=False):
     config = load_config()
     cam_cfg = config["camera"]
     
@@ -51,9 +51,13 @@ def run(source=None):
         while True:
             ret, frame = cap.read()
             if not ret:
-                logger.warning("Frame read failed — end of stream or disconnected camera")
-                break
-            
+                if loop:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue
+                else:
+                    logger.warning("Frame read failed — end of stream or disconnected camera")
+                    break
+            frame = cv2.resize(frame, (640, 480))
             detections = detector.detect(frame)
             fps_counter.tick()
             
@@ -83,6 +87,9 @@ def run(source=None):
 
 
 if __name__ == "__main__":
-    import sys
-    src = sys.argv[1] if len(sys.argv) > 1 else None
-    run(source=src)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("source")
+    parser.add_argument("--loop", action="store_true")
+    args = parser.parse_args()
+    run(source=args.source, loop=args.loop)

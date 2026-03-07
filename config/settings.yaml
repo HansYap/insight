@@ -15,7 +15,7 @@ camera:
 models:
   yolo:
     path: "models/yolov8n.pt"
-    confidence_threshold: 0.45
+    confidence_threshold: 0.6
     iou_threshold: 0.45
     device: "cpu"
     imgsz: 320                 # Start at 320 — faster than 640 on Pi
