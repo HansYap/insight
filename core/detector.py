@@ -40,7 +40,7 @@ class ObjectDetector:
             frame,
             conf=self.conf,
             iou=self.iou,
-            device=self.device,
+            #device=self.device,
             imgsz=self.imgsz,
             verbose=False
         )
