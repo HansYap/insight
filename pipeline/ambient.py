@@ -47,7 +47,7 @@ def run(source=None, loop=False):
     last_stats_log = time.time()
     stats_interval = config["database"]["log_fps_interval"]
 
-    PROCESS_EVERY_N_FRAMES = 3
+    PROCESS_EVERY_N_FRAMES = 5
     frame_count = 0
     
     try:
