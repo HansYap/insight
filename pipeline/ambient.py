@@ -8,6 +8,7 @@ from core.detector import ObjectDetector
 from core.database import EventDatabase
 from utils.fps_counter import FPSCounter
 from utils.memory_monitor import MemoryMonitor
+from core.room_state import RoomStateTracker
 
 
 def load_config(path="config/settings.yaml"):
@@ -16,9 +17,11 @@ def load_config(path="config/settings.yaml"):
 
 
 def run(source=None, loop=False):
+    
     config = load_config()
     cam_cfg = config["camera"]
-    
+    state_tracker = RoomStateTracker(empty_grace_seconds=3.0)
+
     # source=None → use config, source="path/to/video" → override for testing
     video_source = source if source is not None else cam_cfg["source"]
     
@@ -69,6 +72,10 @@ def run(source=None, loop=False):
 
             small_frame = cv2.resize(frame, (320, 240))
             detections = detector.detect(small_frame)
+            room_state, event = state_tracker.update(detections)
+
+            if event:
+                db.log_room_event(event)
             
             
             # Log interesting detections to DB
