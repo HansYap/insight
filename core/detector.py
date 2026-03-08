@@ -19,7 +19,7 @@ class ObjectDetector:
             self.model = YOLO("yolov8n.pt")  # auto-downloads
             exported_folder = "yolov8n_openvino_model"
 
-            self.model.export(format="openvino", half=True) 
+            self.model.export(format="openvino", imgsz=self.imgsz, half=True, int8=False) 
             Path(exported_folder).rename(self.model_path)
             #self.model_path.parent.mkdir(parents=True, exist_ok=True)
         #     self.model.save(str(self.model_path))
@@ -27,7 +27,7 @@ class ObjectDetector:
         #     self.model = YOLO(str(self.model_path))
         # logger.info(f"YOLOv8n loaded from {self.model_path}")
         self.model = YOLO(str(self.model_path), task="detect")
-        logger.info(f"YOLOv8n NCNN loaded from {self.model_path}")
+        logger.info(f"YOLOv8n OPENVINO loaded from {self.model_path}")
 
     def detect(self, frame):
         """
