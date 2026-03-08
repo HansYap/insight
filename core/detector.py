@@ -19,7 +19,7 @@ class ObjectDetector:
             self.model = YOLO("yolov8n.pt")  # auto-downloads
             exported_folder = "yolov8n_ncnn_model"
 
-            self.model.export(format="ncnn") 
+            self.model.export(format="ncnn", half=True) 
             Path(exported_folder).rename(self.model_path)
             #self.model_path.parent.mkdir(parents=True, exist_ok=True)
         #     self.model.save(str(self.model_path))
