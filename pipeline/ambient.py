@@ -67,7 +67,7 @@ def run(source=None, loop=False):
             if frame_count % PROCESS_EVERY_N_FRAMES != 0:
                 continue
 
-            small_frame = cv2.resize(frame, (640, 480))
+            small_frame = cv2.resize(frame, (320, 4240))
             detections = detector.detect(small_frame)
             
             
