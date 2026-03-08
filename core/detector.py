@@ -17,7 +17,7 @@ class ObjectDetector:
         if not self.model_path.exists():
             logger.info(f"Model not found at {self.model_path}, downloading...")
             self.model = YOLO("yolov8n.pt")  # auto-downloads
-            exported_folder = "yolov8n_ncnn_model"
+            exported_folder = "yolov8n_openvino_model"
 
             self.model.export(format="openvino", half=True) 
             Path(exported_folder).rename(self.model_path)
