@@ -17,11 +17,15 @@ class ObjectDetector:
         if not self.model_path.exists():
             logger.info(f"Model not found at {self.model_path}, downloading...")
             self.model = YOLO("yolov8n.pt")  # auto-downloads
-            self.model_path.parent.mkdir(parents=True, exist_ok=True)
-            self.model.save(str(self.model_path))
-        else:
-            self.model = YOLO(str(self.model_path))
-        logger.info(f"YOLOv8n loaded from {self.model_path}")
+            self.model.export(format="ncnn") 
+            Path(exported_path).rename(self.model_path)
+            #self.model_path.parent.mkdir(parents=True, exist_ok=True)
+        #     self.model.save(str(self.model_path))
+        # else:
+        #     self.model = YOLO(str(self.model_path))
+        # logger.info(f"YOLOv8n loaded from {self.model_path}")
+        self.model = YOLO(str(self.model_path), task="detect")
+        logger.info(f"YOLOv8n NCNN loaded from {self.model_path}")
 
     def detect(self, frame):
         """
