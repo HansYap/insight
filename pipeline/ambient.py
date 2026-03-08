@@ -46,6 +46,9 @@ def run(source=None, loop=False):
     trigger_classes = set(config["detection"]["trigger_classes"])
     last_stats_log = time.time()
     stats_interval = config["database"]["log_fps_interval"]
+
+    PROCESS_EVERY_N_FRAMES = 3
+    frame_count = 0
     
     try:
         while True:
@@ -57,9 +60,16 @@ def run(source=None, loop=False):
                 else:
                     logger.warning("Frame read failed — end of stream or disconnected camera")
                     break
-            frame = cv2.resize(frame, (640, 480))
-            detections = detector.detect(frame)
+
+            frame_count += 1
             fps_counter.tick()
+            
+            if frame_count % PROCESS_EVERY_N_FRAMES != 0:
+                continue
+
+            small_frame = cv2.resize(frame, (640, 480))
+            detections = detector.detect(small_frame)
+            
             
             # Log interesting detections to DB
             for det in detections:
