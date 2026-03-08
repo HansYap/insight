@@ -14,7 +14,8 @@ camera:
 
 models:
   yolo:
-    path: "models/yolov8n.pt"
+    #path: "models/yolov8n.pt"
+    path: models/yolov8n_ncnn_model
     confidence_threshold: 0.6
     iou_threshold: 0.45
     device: "cpu"
