@@ -10,10 +10,12 @@ class FlorenceInferencer:
     def __init__(self):
         print("Loading Florence-2... (first load takes ~30s)")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.torch_dtype = torch.float16 if self.device == "cuda" else torch.float32
+
         self.model = AutoModelForCausalLM.from_pretrained(
             MODEL_ID,
             trust_remote_code=True,
-            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
+            torch_dtype=self.torch_dtype
         ).to(self.device)
         self.processor = AutoProcessor.from_pretrained(
             MODEL_ID, trust_remote_code=True
@@ -22,7 +24,7 @@ class FlorenceInferencer:
 
     def describe(self, image_bytes: bytes, prompt: str = "<MORE_DETAILED_CAPTION>") -> dict:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
+        inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device, self.torch_dtype)
         
         with torch.no_grad():
             generated_ids = self.model.generate(

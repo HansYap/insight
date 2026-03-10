@@ -16,6 +16,20 @@ def load_config(path="config/settings.yaml"):
         return yaml.safe_load(f)
 
 
+from frame_client import send_frame_for_description
+
+def on_event_triggered(event: dict, frame):
+    logger.info(f"[FLORENCE] Querying for event: {event['type']}")
+    result = send_frame_for_description(frame)
+    
+    if "error" in result:
+        logger.warning(f"[FLORENCE] Failed: {result['error']}")
+        return
+    
+    description = result.get("description", "")
+    logger.info(f"[FLORENCE] {description}")
+
+
 def run(source=None, loop=False):
     
     config = load_config()
@@ -76,7 +90,7 @@ def run(source=None, loop=False):
 
             if event:
                 db.log_room_event(event)
-            
+                on_event_triggered(event, frame)
             
             # Log interesting detections to DB
             for det in detections:

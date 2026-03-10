@@ -4,7 +4,7 @@ from florence_model import FlorenceInferencer
 import uvicorn
 
 app = FastAPI()
-inferencer = FlorenceInferencer()  # loads once at startup
+inferencer = FlorenceInferencer() 
 
 @app.post("/describe")
 async def describe_frame(
