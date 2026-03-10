@@ -1,6 +1,7 @@
 import cv2
 import yaml
 import time
+import threading
 from pathlib import Path
 from loguru import logger
 
@@ -89,7 +90,7 @@ def run(source=None, loop=False):
 
             if event:
                 db.log_room_event(event)
-                on_event_triggered(event, frame)
+                threading.Thread(target=on_event_triggered, args=(event, frame.copy()), daemon=True).start()
             
             # Log interesting detections to DB
             for det in detections:
