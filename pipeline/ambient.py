@@ -9,14 +9,13 @@ from core.database import EventDatabase
 from utils.fps_counter import FPSCounter
 from utils.memory_monitor import MemoryMonitor
 from core.room_state import RoomStateTracker
+from core.frame_client import send_frame_for_description
 
 
 def load_config(path="config/settings.yaml"):
     with open(path) as f:
         return yaml.safe_load(f)
 
-
-from frame_client import send_frame_for_description
 
 def on_event_triggered(event: dict, frame):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
