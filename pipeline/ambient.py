@@ -18,10 +18,12 @@ def load_config(path="config/settings.yaml"):
         return yaml.safe_load(f)
 
 
-def on_event_triggered(event: dict, frame):
+def on_event_triggered(event: dict, latest_frame: dict):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
     if event["type"] == "person_entered":
-        time.sleep(5.0)
+        time.sleep(3.0)
+    
+    frame = latest_frame["frame"]
 
     ROOT = Path(__file__).parent.parent
     save_dir = ROOT / "debug_frames"
@@ -81,6 +83,8 @@ def run(source=None, loop=False):
     frame_count = 0
     
     try:
+        latest_frame = {"frame": None}
+
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -97,8 +101,6 @@ def run(source=None, loop=False):
             if frame_count % PROCESS_EVERY_N_FRAMES != 0:
                 continue
 
-            latest_frame = {"frame": None}
-
             small_frame = cv2.resize(frame, (320, 240))
             detections = detector.detect(small_frame)
             latest_frame["frame"] = frame.copy()
@@ -106,7 +108,7 @@ def run(source=None, loop=False):
 
             if event:
                 db.log_room_event(event)
-                threading.Thread(target=on_event_triggered, args=(event, frame.copy()), daemon=True).start()
+                threading.Thread(target=on_event_triggered, args=(event, latest_frame), daemon=True).start()
             
             # Log interesting detections to DB
             for det in detections:
