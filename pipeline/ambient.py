@@ -20,6 +20,16 @@ def load_config(path="config/settings.yaml"):
 
 def on_event_triggered(event: dict, frame):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
+    ROOT = Path(__file__).parent.parent
+    save_dir = ROOT / "debug_frames"
+    save_dir.mkdir(exist_ok=True)
+
+    timestamp = int(event["time stamp"])
+    event_type = event["type"]
+    save_path = save_dir / f"{event_type}_{timestamp}.jpg"
+
+    cv2.imwrite(save_path, frame)
+
     result = send_frame_for_description(frame)
     
     if "error" in result:
