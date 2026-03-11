@@ -24,7 +24,7 @@ def on_event_triggered(event: dict, frame):
     save_dir = ROOT / "debug_frames"
     save_dir.mkdir(exist_ok=True)
 
-    timestamp = int(event["time stamp"])
+    timestamp = int(event["timestamp"])
     event_type = event["type"]
     save_path = save_dir / f"{event_type}_{timestamp}.jpg"
 
