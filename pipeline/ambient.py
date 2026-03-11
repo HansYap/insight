@@ -20,10 +20,9 @@ def load_config(path="config/settings.yaml"):
 
 def on_event_triggered(event: dict, frame):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
-
     if event["type"] == "person_entered":
         time.sleep(2.0)
-        
+
     ROOT = Path(__file__).parent.parent
     save_dir = ROOT / "debug_frames"
     save_dir.mkdir(exist_ok=True)
@@ -98,8 +97,11 @@ def run(source=None, loop=False):
             if frame_count % PROCESS_EVERY_N_FRAMES != 0:
                 continue
 
+            latest_frame = {"frame": None}
+
             small_frame = cv2.resize(frame, (320, 240))
             detections = detector.detect(small_frame)
+            latest_frame["frame"] = frame.copy()
             room_state, event = state_tracker.update(detections)
 
             if event:
