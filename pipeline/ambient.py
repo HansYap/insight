@@ -20,6 +20,10 @@ def load_config(path="config/settings.yaml"):
 
 def on_event_triggered(event: dict, frame):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
+
+    if event["type"] == "person_entered":
+        time.sleep(2.0)
+        
     ROOT = Path(__file__).parent.parent
     save_dir = ROOT / "debug_frames"
     save_dir.mkdir(exist_ok=True)
