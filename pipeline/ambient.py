@@ -6,7 +6,7 @@ from pathlib import Path
 from loguru import logger
 
 from core.detector import ObjectDetector
-from core.database import EventDatabase
+from core.sql_database import EventDatabase
 from utils.fps_counter import FPSCounter
 from utils.memory_monitor import MemoryMonitor
 from core.room_state import RoomStateTracker
@@ -24,6 +24,8 @@ def on_event_triggered(event: dict, latest_frame: dict):
         time.sleep(3.0)
     
     frame = latest_frame["frame"]
+    if frame is None:
+        return
 
     ROOT = Path(__file__).parent.parent
     save_dir = ROOT / "debug_frames"
@@ -42,8 +44,21 @@ def on_event_triggered(event: dict, latest_frame: dict):
         return
     
     description = result.get("description", "")
-    logger.info(f"[FLORENCE] {description}")
+    confident = result.get("confident", False)
+    label = result.get("label", "")
+    score = result.get("score", 0.0)
 
+    if confident:
+        logger.info(f"[INSIGHT] {label} (confidence: {score})")
+    else:
+        # system is uncertain ask user
+        logger.info(f"[FLORENCE] {description}")
+        logger.info(f"[INSIGHT] I'm not sure what's happening. What are you doing?")
+        
+        user_label = input(">> ").strip()
+        if user_label:
+            store_memory(description, user_label)
+            logger.info(f"[INSIGHT] Got it. I'll remember this as: '{user_label}'")
 
 def run(source=None, loop=False):
     

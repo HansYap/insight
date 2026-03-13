@@ -3,8 +3,7 @@ import requests
 import cv2
 import time
 
-THINKPAD_URL = "http://192.168.68.109:8000/describe"
-# Find ThinkPad IP: ip addr show on ThinkPad, look for 192.168.x.x
+THINKPAD_URL = "http://192.168.68.109:8000"
 
 def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>"):
     """
@@ -16,13 +15,25 @@ def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>"):
     
     try:
         response = requests.post(
-            THINKPAD_URL,
+            f"{THINKPAD_URL}/describe",
             files={"frame": ("frame.jpg", jpeg_bytes.tobytes(), "image/jpeg")},
             data={"prompt": prompt},
-            timeout=30  # Florence-2 on CPU can take 3-5s
+            timeout=30 
         )
         return response.json()
     except requests.exceptions.ConnectionError:
         return {"error": "ThinkPad server not reachable"}
     except requests.exceptions.Timeout:
         return {"error": "Florence-2 inference timed out"}
+
+
+def store_memory(description: str, label: str):
+    try:
+        response = requests.post(
+            f"{THINKPAD_URL}/store",
+            data={"description": description, "label": label},
+            timeout=10,
+        )
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
