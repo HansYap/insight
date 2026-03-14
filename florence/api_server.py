@@ -84,26 +84,44 @@ def get_pending():
     return load_queue()
 
 
+# api_server.py
 @app.post("/label/{item_id}")
-async def label_item(item_id: str, label: str = Form(...)):
-    """User submits a label from the inbox UI."""
+async def label_item(item_id: str, activity: str = Form(...), subject: str = Form(...)):
     queue = load_queue()
     item = next((i for i in queue if i["id"] == item_id), None)
     
     if not item:
         return {"error": "Item not found"}
 
-    # Store to ChromaDB
-    memory.store(item["description"], label)
+    # store with normalization — get back the actual label used
+    used_label = memory.store(item["description"], activity, subject)
 
-    # Remove from queue and clean up frame
+    # remove from queue
     queue = [i for i in queue if i["id"] != item_id]
     save_queue(queue)
     frame_path = FRAMES_DIR / f"{item_id}.jpg"
     if frame_path.exists():
         frame_path.unlink()
 
-    return {"labeled": True, "label": label, "remaining": len(queue)}
+    return {"labeled": True, "label": used_label, "remaining": len(queue)}
+
+# api_server.py
+@app.get("/labels")
+def get_labels():
+    """Return all unique labels currently in ChromaDB."""
+    if memory.collection.count() == 0:
+        return {"labels": []}
+    all_meta = memory.collection.get(include=["metadatas"])["metadatas"]
+    
+    # count usage of each label
+    counts = {}
+    for m in all_meta:
+        label = m["label"]
+        counts[label] = counts.get(label, 0) + 1
+    
+    # sort by most used first
+    sorted_labels = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+    return {"labels": [{"label": l, "count": c} for l, c in sorted_labels]}
 
 
 @app.delete("/dismiss/{item_id}")

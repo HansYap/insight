@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jarvis Inbox</title>
+<title>Insight Inbox</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
@@ -22,12 +22,13 @@
   .event-badge.left { background: #3a1e1e; color: #f87171; }
   .description { font-size: 0.8rem; color: #999; line-height: 1.5; margin-bottom: 12px; max-height: 80px; overflow-y: auto; }
   .score { font-size: 0.72rem; color: #555; margin-bottom: 12px; }
-  .input-row { display: flex; gap: 8px; }
-  .input-row input {
+  .field-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .field-row input {
     flex: 1; background: #111; border: 1px solid #333; border-radius: 6px;
     padding: 8px 10px; color: #e0e0e0; font-size: 0.85rem; outline: none;
   }
-  .input-row input:focus { border-color: #4ade80; }
+  .field-row input:focus { border-color: #4ade80; }
+  .preview-label { font-size: 0.75rem; color: #4ade80; min-height: 16px; }
   .btn { 
     padding: 8px 14px; border: none; border-radius: 6px; font-size: 0.8rem;
     cursor: pointer; font-weight: 600; transition: opacity 0.15s;
@@ -40,6 +41,15 @@
   .count-badge { background: #1e3a2f; color: #4ade80; font-size: 0.8rem; padding: 4px 12px; border-radius: 99px; }
   .refresh-btn { background: none; border: 1px solid #333; color: #666; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; }
   .refresh-btn:hover { border-color: #555; color: #999; }
+  .labels-header { font-size: 0.72rem; color: #555; margin-bottom: 8px; }
+  .labels-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .label-chip {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 99px;
+    padding: 4px 10px; font-size: 0.75rem; color: #aaa; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .label-chip:hover { border-color: #4ade80; color: #4ade80; }
+  .label-count { color: #444; font-size: 0.68rem; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -55,10 +65,12 @@
   </div>
 </div>
 
+<div id="labels-panel" style="margin-bottom: 20px;"></div>
 <div id="content"><div class="empty">Loading...</div></div>
 
 <script>
 async function load() {
+  await Promise.all([loadPending(), loadLabels()]);  
   const res = await fetch("/pending");
   const items = await res.json();
   
@@ -86,11 +98,17 @@ function renderCard(item) {
         <div class="event-badge ${isLeft ? 'left' : ''}">${item.event_type}</div>
         <div class="description">${item.description}</div>
         <div class="score">Confidence score: ${item.score}</div>
-        <div class="input-row">
-          <input type="text" id="label-${item.id}" placeholder="What's happening here?" 
-                 onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
-          <button class="btn btn-label" onclick="submitLabel('${item.id}')">Save</button>
-          <button class="btn btn-dismiss" onclick="dismiss('${item.id}')">✕</button>
+        <!-- replace the old input-row div in renderCard() -->
+        <div class="field-row">
+            <input type="text" id="activity-${item.id}" placeholder="Activity (e.g. feeding)" 
+                onfocus="lastFocusedId='${item.id}'" onkeydown="if(event.key==='Enter') document.getElementById('subject-${item.id}').focus()">
+            <input type="text" id="subject-${item.id}" placeholder="Subject (e.g. centipede)"
+                onfocus="lastFocusedId='${item.id}'" onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
+        </div>
+        <div class="preview-label" id="preview-${item.id}"></div>
+        <div class="input-row" style="margin-top:8px;">
+            <button class="btn btn-label" onclick="submitLabel('${item.id}')">Save</button>
+            <button class="btn btn-dismiss" onclick="dismiss('${item.id}')">✕</button>
         </div>
         <div class="timestamp">${date}</div>
       </div>
@@ -98,22 +116,62 @@ function renderCard(item) {
 }
 
 async function submitLabel(id) {
-  const input = document.getElementById(`label-${id}`);
-  const label = input.value.trim();
-  if (!label) return;
+  const activity = document.getElementById(`activity-${id}`).value.trim();
+  const subject = document.getElementById(`subject-${id}`).value.trim();
+  if (!activity) return;
 
-  input.disabled = true;
   const form = new FormData();
-  form.append("label", label);
+  form.append("activity", activity);
+  form.append("subject", subject);
 
-  await fetch(`/label/${id}`, { method: "POST", body: form });
+  const res = await fetch(`/label/${id}`, { method: "POST", body: form });
+  const data = await res.json();
+  
+  // show what label was actually stored (may have been normalized)
+  const preview = document.getElementById(`preview-${id}`);
+  if (data.label !== `${activity} ${subject}`.trim()) {
+    preview.textContent = `→ normalized to: "${data.label}"`;
+    await new Promise(r => setTimeout(r, 1500)); // let them see it
+  }
+
   document.getElementById(`card-${id}`).remove();
-
-  // update count
   const remaining = document.querySelectorAll(".card").length;
   document.getElementById("count-badge").textContent = `${remaining} pending`;
-  if (remaining === 0) load(); // show "all caught up"
+  if (remaining === 0) load();
 }
+
+async function loadLabels() {
+  const res = await fetch("/labels");
+  const data = await res.json();
+  
+  if (data.labels.length === 0) return;
+  
+  const container = document.getElementById("labels-panel");
+  container.innerHTML = `
+    <div class="labels-header">Existing labels — click to copy</div>
+    <div class="labels-list">
+      ${data.labels.map(l => `
+        <span class="label-chip" onclick="copyLabel('${l.label}')">
+          ${l.label} <span class="label-count">${l.count}</span>
+        </span>
+      `).join("")}
+    </div>`;
+}
+
+function copyLabel(label) {
+  // split into activity + subject and fill whichever card input is focused
+  // or just fill the last focused card's activity field
+  const parts = label.split(" ");
+  const activity = parts[0] || "";
+  const subject = parts.slice(1).join(" ") || "";
+  
+  if (lastFocusedId) {
+    document.getElementById(`activity-${lastFocusedId}`).value = activity;
+    document.getElementById(`subject-${lastFocusedId}`).value = subject;
+  }
+}
+
+let lastFocusedId = null;
 
 async function dismiss(id) {
   await fetch(`/dismiss/${id}`, { method: "DELETE" });
