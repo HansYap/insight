@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from florence_model import FlorenceInferencer
-from memory import SceneMemory
+from chroma_database import SceneMemory
 import uvicorn
 import json
 import uuid
