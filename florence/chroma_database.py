@@ -49,14 +49,15 @@ class SceneMemory:
             "nearest_description": results["documents"][0][0]
         }
 
-    def store(self, description: str, label: str):
-        """Store a new labeled memory."""
+    def store(self, description: str, activity: str, subject: str = "") -> str:
         label = f"{activity} {subject}".strip()
-
+        
         existing_label = self.find_similar_label(label)
         if existing_label:
             label = existing_label
-            activity, subject = label.split(" ", 1) if " " in label else (label, "")
+            parts = label.split(" ", 1)
+            activity = parts[0]
+            subject = parts[1] if len(parts) > 1 else ""
 
         embedding = self.embed(description)
         doc_id = f"scene_{int(time.time() * 1000)}"

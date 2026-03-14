@@ -69,8 +69,13 @@
 <div id="content"><div class="empty">Loading...</div></div>
 
 <script>
+let lastFocusedId = null;
+
 async function load() {
-  await Promise.all([loadPending(), loadLabels()]);  
+  await Promise.all([loadPending(), loadLabels()]);
+}
+
+async function loadPending() {
   const res = await fetch("/pending");
   const items = await res.json();
   
@@ -170,8 +175,6 @@ function copyLabel(label) {
     document.getElementById(`subject-${lastFocusedId}`).value = subject;
   }
 }
-
-let lastFocusedId = null;
 
 async function dismiss(id) {
   await fetch(`/dismiss/${id}`, { method: "DELETE" });
