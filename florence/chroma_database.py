@@ -3,7 +3,7 @@ from sentence_transformers import SentenceTransformer
 from pathlib import Path
 import time
 
-CHROMA_PATH = Path(__file__).parent / "data" / "chroma_db"
+CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
 COLLECTION_NAME = "insight_scenes"
 CONFIDENCE_THRESHOLD = 0.80  
 

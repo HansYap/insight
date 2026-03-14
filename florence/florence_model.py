@@ -40,5 +40,8 @@ class FlorenceInferencer:
         description = self.processor.post_process_generation(
             description, task=prompt, image_size=(image.width, image.height)
         )
+
+        if isinstance(description, dict):
+            description = next(iter(description.values()))
         
         return {"description": description, "prompt_used": prompt}

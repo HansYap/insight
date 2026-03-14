@@ -14,7 +14,7 @@ app = FastAPI()
 inferencer = FlorenceInferencer() 
 memory = SceneMemory()
 
-PENDING_DIR = Path(__file__).parent / "data" / "pending"
+PENDING_DIR = Path(__file__).parent.parent / "data" / "chroma_db" / "pending"
 PENDING_DIR.mkdir(exist_ok=True)
 FRAMES_DIR = PENDING_DIR / "frames"
 FRAMES_DIR.mkdir(exist_ok=True)
