@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jarvis Inbox</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 24px; }
+  .empty { color: #444; text-align: center; padding: 80px; font-size: 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; overflow: hidden; }
+  .card img { width: 100%; height: 200px; object-fit: cover; display: block; background: #111; }
+  .card-body { padding: 14px; }
+  .event-badge { 
+    display: inline-block; font-size: 0.7rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 99px; margin-bottom: 10px;
+    background: #1e3a2f; color: #4ade80;
+  }
+  .event-badge.left { background: #3a1e1e; color: #f87171; }
+  .description { font-size: 0.8rem; color: #999; line-height: 1.5; margin-bottom: 12px; max-height: 80px; overflow-y: auto; }
+  .score { font-size: 0.72rem; color: #555; margin-bottom: 12px; }
+  .input-row { display: flex; gap: 8px; }
+  .input-row input {
+    flex: 1; background: #111; border: 1px solid #333; border-radius: 6px;
+    padding: 8px 10px; color: #e0e0e0; font-size: 0.85rem; outline: none;
+  }
+  .input-row input:focus { border-color: #4ade80; }
+  .btn { 
+    padding: 8px 14px; border: none; border-radius: 6px; font-size: 0.8rem;
+    cursor: pointer; font-weight: 600; transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.8; }
+  .btn-label { background: #4ade80; color: #0f0f0f; }
+  .btn-dismiss { background: #2a2a2a; color: #666; }
+  .timestamp { font-size: 0.7rem; color: #444; margin-top: 10px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .count-badge { background: #1e3a2f; color: #4ade80; font-size: 0.8rem; padding: 4px 12px; border-radius: 99px; }
+  .refresh-btn { background: none; border: 1px solid #333; color: #666; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; }
+  .refresh-btn:hover { border-color: #555; color: #999; }
+</style>
+</head>
+<body>
+
+<div class="header-row">
+  <div>
+    <h1>Jarvis Inbox</h1>
+    <div class="subtitle">Label uncertain events to grow the memory</div>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <span class="count-badge" id="count-badge">— pending</span>
+    <button class="refresh-btn" onclick="load()">Refresh</button>
+  </div>
+</div>
+
+<div id="content"><div class="empty">Loading...</div></div>
+
+<script>
+async function load() {
+  const res = await fetch("/pending");
+  const items = await res.json();
+  
+  document.getElementById("count-badge").textContent = `${items.length} pending`;
+  const content = document.getElementById("content");
+
+  if (items.length === 0) {
+    content.innerHTML = '<div class="empty">All caught up — no pending items.</div>';
+    return;
+  }
+
+  // newest first
+  items.sort((a, b) => b.timestamp - a.timestamp);
+
+  content.innerHTML = `<div class="grid">${items.map(renderCard).join("")}</div>`;
+}
+
+function renderCard(item) {
+  const date = new Date(item.timestamp * 1000).toLocaleString();
+  const isLeft = item.event_type === "person_left";
+  return `
+    <div class="card" id="card-${item.id}">
+      <img src="${item.frame_url}" alt="event frame" loading="lazy">
+      <div class="card-body">
+        <div class="event-badge ${isLeft ? 'left' : ''}">${item.event_type}</div>
+        <div class="description">${item.description}</div>
+        <div class="score">Confidence score: ${item.score}</div>
+        <div class="input-row">
+          <input type="text" id="label-${item.id}" placeholder="What's happening here?" 
+                 onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
+          <button class="btn btn-label" onclick="submitLabel('${item.id}')">Save</button>
+          <button class="btn btn-dismiss" onclick="dismiss('${item.id}')">✕</button>
+        </div>
+        <div class="timestamp">${date}</div>
+      </div>
+    </div>`;
+}
+
+async function submitLabel(id) {
+  const input = document.getElementById(`label-${id}`);
+  const label = input.value.trim();
+  if (!label) return;
+
+  input.disabled = true;
+  const form = new FormData();
+  form.append("label", label);
+
+  await fetch(`/label/${id}`, { method: "POST", body: form });
+  document.getElementById(`card-${id}`).remove();
+
+  // update count
+  const remaining = document.querySelectorAll(".card").length;
+  document.getElementById("count-badge").textContent = `${remaining} pending`;
+  if (remaining === 0) load(); // show "all caught up"
+}
+
+async function dismiss(id) {
+  await fetch(`/dismiss/${id}`, { method: "DELETE" });
+  document.getElementById(`card-${id}`).remove();
+  const remaining = document.querySelectorAll(".card").length;
+  document.getElementById("count-badge").textContent = `${remaining} pending`;
+  if (remaining === 0) load();
+}
+
+load();
+</script>
+</body>
+</html>

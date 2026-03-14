@@ -10,7 +10,7 @@ from core.sql_database import EventDatabase
 from utils.fps_counter import FPSCounter
 from utils.memory_monitor import MemoryMonitor
 from core.room_state import RoomStateTracker
-from core.frame_client import send_frame_for_description
+from core.frame_client import send_frame_for_description, queue_pending
 
 
 def load_config(path="config/settings.yaml"):
@@ -51,14 +51,9 @@ def on_event_triggered(event: dict, latest_frame: dict):
     if confident:
         logger.info(f"[INSIGHT] {label} (confidence: {score})")
     else:
-        # system is uncertain ask user
-        logger.info(f"[FLORENCE] {description}")
-        logger.info(f"[INSIGHT] I'm not sure what's happening. What are you doing?")
-        
-        user_label = input(">> ").strip()
-        if user_label:
-            store_memory(description, user_label)
-            logger.info(f"[INSIGHT] Got it. I'll remember this as: '{user_label}'")
+        queue_result = queue_pending(frame, description, event["type"], score)
+        logger.info(f"[JARVIS] Uncertain ({score}) — added to inbox. {queue_result.get('total_pending', '?')} pending.")
+
 
 def run(source=None, loop=False):
     

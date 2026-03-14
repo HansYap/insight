@@ -27,12 +27,14 @@ def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>"):
         return {"error": "Florence-2 inference timed out"}
 
 
-def store_memory(description: str, label: str):
+def queue_pending(frame, description: str, event_type: str, score: float):
+    _, jpeg_bytes = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
     try:
         response = requests.post(
-            f"{THINKPAD_URL}/store",
-            data={"description": description, "label": label},
-            timeout=10,
+            f"{THINKPAD_URL}/queue-pending",
+            files={"frame": ("frame.jpg", jpeg_bytes.tobytes(), "image/jpeg")},
+            data={"description": description, "event_type": event_type, "score": score},
+            timeout=15
         )
         return response.json()
     except Exception as e:
