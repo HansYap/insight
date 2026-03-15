@@ -1,10 +1,9 @@
-# thinkpad/florence_model.py
 from transformers import AutoProcessor, AutoModelForCausalLM
 import torch
 from PIL import Image
 import io
 
-MODEL_ID = "microsoft/Florence-2-base"  # ~900MB — use base not large for now
+MODEL_ID = "microsoft/Florence-2-base"  
 
 class FlorenceInferencer:
     def __init__(self):
@@ -41,6 +40,7 @@ class FlorenceInferencer:
             description, task=prompt, image_size=(image.width, image.height)
         )
 
+        # return string only
         if isinstance(description, dict):
             description = next(iter(description.values()))
         

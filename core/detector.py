@@ -16,16 +16,12 @@ class ObjectDetector:
     def load(self):
         if not self.model_path.exists():
             logger.info(f"Model not found at {self.model_path}, downloading...")
-            self.model = YOLO("yolov8n.pt")  # auto-downloads
+            self.model = YOLO("yolov8n.pt") 
             exported_folder = "yolov8n_openvino_model"
 
             self.model.export(format="openvino", imgsz=self.imgsz, half=True, int8=False) 
             Path(exported_folder).rename(self.model_path)
-            #self.model_path.parent.mkdir(parents=True, exist_ok=True)
-        #     self.model.save(str(self.model_path))
-        # else:
-        #     self.model = YOLO(str(self.model_path))
-        # logger.info(f"YOLOv8n loaded from {self.model_path}")
+            
         self.model = YOLO(str(self.model_path), task="detect")
         logger.info(f"YOLOv8n OPENVINO loaded from {self.model_path}")
 
@@ -40,7 +36,6 @@ class ObjectDetector:
             frame,
             conf=self.conf,
             iou=self.iou,
-            #device=self.device,
             imgsz=self.imgsz,
             verbose=False
         )

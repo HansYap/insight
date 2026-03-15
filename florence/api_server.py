@@ -148,5 +148,4 @@ def health():
     return {"status": "ok", "memories": memory.collection.count()}
 
 if __name__ == "__main__":
-    # 0.0.0.0 so Pi can reach it over LAN
     uvicorn.run(app, host="0.0.0.0", port=8000)

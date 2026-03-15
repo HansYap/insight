@@ -1,4 +1,3 @@
-# pi/frame_client.py
 import requests
 import cv2
 import time
@@ -14,9 +13,10 @@ def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>"):
     _, jpeg_bytes = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
     
     try:
+        # .tobytes() because pass into api instead of numpy array (cv2 uses numpy)
         response = requests.post(
             f"{THINKPAD_URL}/describe",
-            files={"frame": ("frame.jpg", jpeg_bytes.tobytes(), "image/jpeg")},
+            files={"frame": ("frame.jpg", jpeg_bytes.tobytes(), "image/jpeg")}, 
             data={"prompt": prompt},
             timeout=30 
         )
