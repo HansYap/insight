@@ -87,13 +87,13 @@ class SceneMemory:
         existing_labels = list({m["label"] for m in all_meta})
         
         candidate_emb = self.embedder.encode(candidate)
-        for existing in existing_labels:
-            existing_emb = self.embedder.encode(existing)
-            # cosine similarity
-            sim = float(
-                (candidate_emb @ existing_emb) / 
-                (np.linalg.norm(candidate_emb) * np.linalg.norm(existing_emb))
-            )
-            if sim >= threshold:
-                return existing
+        existing_embs = self.embedder.encode(existing_labels)
+
+        norms = np.linalg.norm(existing_embs, axis=1) * np.linalg.norm(candidate_emb)
+        sims = (existing_embs @ candidate_emb) / norms
+
+        best_idx = int(np.argmax(sims))
+        if sims[best_idx] >= threshold:
+            return existing_labels[best_idx]
+
         return None
