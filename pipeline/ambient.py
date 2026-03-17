@@ -3,14 +3,21 @@ import yaml
 import time
 import threading
 from pathlib import Path
+from datetime import datetime
 from loguru import logger
 
 from core.detector import ObjectDetector
 from core.sql_database import EventDatabase
 from utils.fps_counter import FPSCounter
 from utils.memory_monitor import MemoryMonitor
-from core.room_state import RoomStateTracker
+from core.room_state import RoomStateTracker, RoomState
 from core.frame_client import send_frame_for_description, queue_pending
+
+# Motion delta config
+MOTION_THRESHOLD    = 500_000   # tune: lower = more sensitive (320x240 frame)
+MOTION_COOLDOWN_SEC = 45        # min seconds between Florence re-triggers while occupied
+CONFIDENT_COOLDOWN_SEC = 90     # longer cooldown after a confident recognition
+REFERENCE_UPDATE_SECS = 5       # how often to refresh the reference frame
 
 
 def load_config(path="config/settings.yaml"):
@@ -18,11 +25,12 @@ def load_config(path="config/settings.yaml"):
         return yaml.safe_load(f)
 
 
-def on_event_triggered(event: dict, latest_frame: dict):
+def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict, scene: str):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
+
     if event["type"] == "person_entered":
         time.sleep(3.0)
-    
+
     frame = latest_frame["frame"]
     if frame is None:
         return
@@ -30,71 +38,91 @@ def on_event_triggered(event: dict, latest_frame: dict):
     ROOT = Path(__file__).parent.parent
     save_dir = ROOT / "debug_frames"
     save_dir.mkdir(exist_ok=True)
-
     timestamp = int(event["timestamp"])
-    event_type = event["type"]
-    save_path = save_dir / f"{event_type}_{timestamp}.jpg"
+    save_path = save_dir / f"{event['type']}_{timestamp}.jpg"
+    cv2.imwrite(str(save_path), frame)
 
-    cv2.imwrite(save_path, frame)
+    context = {
+        "scene": scene,
+        "hour": datetime.now().hour,
+    }
 
-    result = send_frame_for_description(frame)
-    
+    result = send_frame_for_description(frame, context=context)
+
     if "error" in result:
         logger.warning(f"[FLORENCE] Failed: {result['error']}")
         return
-    
+
     description = result.get("description", "")
-    confident = result.get("confident", False)
-    label = result.get("label", "")
-    score = result.get("score", 0.0)
+    confident   = result.get("confident", False)
+    label       = result.get("label", "")
+    score       = result.get("score", 0.0)
 
     if confident:
         logger.info(f"[INSIGHT] {label} (confidence: {score})")
+        # Extend cooldown — confident recognition, stay quiet longer
+        florence_state["last_confident_at"] = time.time()
     else:
-        queue_result = queue_pending(frame, description, event["type"], score)
-        logger.info(f"[JARVIS] Uncertain ({score}) — added to inbox. {queue_result.get('total_pending', '?')} pending.")
+        queue_result = queue_pending(frame, description, event["type"], score, context=context)
+        logger.info(
+            f"[INSIGHT] Uncertain ({score}) — queued for inbox. "
+            f"{queue_result.get('total_pending', '?')} pending."
+        )
+
+
+def _cooldown_expired(florence_state: dict) -> bool:
+    now = time.time()
+    since_trigger  = now - florence_state["last_trigger_at"]
+    since_confident = now - florence_state["last_confident_at"]
+    # Respect the longer cooldown if we recently had a confident hit
+    if since_confident < CONFIDENT_COOLDOWN_SEC:
+        return False
+    return since_trigger >= MOTION_COOLDOWN_SEC
 
 
 def run(source=None, loop=False):
-    
     config = load_config()
     cam_cfg = config["camera"]
-    state_tracker = RoomStateTracker(empty_grace_seconds=3.0)
+    scene   = config["scene"]["active"]
 
-    # source=None → use config, source="path/to/video" → override for testing
     video_source = source if source is not None else cam_cfg["source"]
-    
-    # Initialize components
-    detector = ObjectDetector(config["models"]["yolo"])
+
+    detector    = ObjectDetector(config["models"]["yolo"])
     detector.load()
-    
-    db = EventDatabase(config["database"]["path"])
+    db          = EventDatabase(config["database"]["path"])
     fps_counter = FPSCounter(window=30)
     mem_monitor = MemoryMonitor()
-    
-    # Open capture
+    state_tracker = RoomStateTracker(empty_grace_seconds=3.0)
+
     cap = cv2.VideoCapture(video_source)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_cfg["width"])
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  cam_cfg["width"])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["height"])
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, cam_cfg["buffer_size"])  # prevent lag
-    
+    cap.set(cv2.CAP_PROP_BUFFERSIZE,   cam_cfg["buffer_size"])
+
     if not cap.isOpened():
         logger.error(f"Cannot open video source: {video_source}")
         return
-    
-    logger.info(f"Pipeline started | Source: {video_source}")
+
+    logger.info(f"Pipeline started | Source: {video_source} | Scene: {scene}")
     logger.info(f"Initial RAM: {mem_monitor.report()}")
-    
-    trigger_classes = set(config["detection"]["trigger_classes"])
-    last_stats_log = time.time()
-    stats_interval = config["database"]["log_fps_interval"]
 
-    PROCESS_EVERY_N_FRAMES = 3
-    frame_count = 0
-    
+    trigger_classes  = set(config["detection"]["trigger_classes"])
+    last_stats_log   = time.time()
+    stats_interval   = config["database"]["log_fps_interval"]
+    PROCESS_EVERY_N  = 3
+    frame_count      = 0
+
+    # Shared state between main loop and Florence threads
+    latest_frame  = {"frame": None}
+    florence_state = {
+        "last_trigger_at":   0.0,
+        "last_confident_at": 0.0,
+    }
+
+    # Motion delta state
+    ref_frame = {"frame": None, "updated_at": 0.0}
+
     try:
-        latest_frame = {"frame": None}
-
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -108,31 +136,78 @@ def run(source=None, loop=False):
             frame_count += 1
             fps_counter.tick()
 
-            if frame_count % PROCESS_EVERY_N_FRAMES != 0:
+            if frame_count % PROCESS_EVERY_N != 0:
                 continue
 
             small_frame = cv2.resize(frame, (320, 240))
-            detections = detector.detect(small_frame)
+            detections  = detector.detect(small_frame)
             latest_frame["frame"] = frame.copy()
+
             room_state, event = state_tracker.update(detections)
 
+            # --- State-machine triggered events (enter / leave) ---
             if event:
                 db.log_room_event(event)
-                threading.Thread(target=on_event_triggered, args=(event, latest_frame), daemon=True).start()
-            
-            # Log interesting detections to DB
+                florence_state["last_trigger_at"] = time.time()
+                threading.Thread(
+                    target=on_event_triggered,
+                    args=(event, latest_frame, florence_state, scene),
+                    daemon=True
+                ).start()
+                # Fresh reference after a state-change trigger
+                ref_frame["frame"]      = small_frame.copy()
+                ref_frame["updated_at"] = time.time()
+
+            # --- Motion delta re-trigger while occupied ---
+            elif room_state in (RoomState.OCCUPIED, RoomState.JUST_ENTERED):
+                now = time.time()
+
+                # Refresh reference frame periodically
+                if now - ref_frame["updated_at"] > REFERENCE_UPDATE_SECS:
+                    if ref_frame["frame"] is None:
+                        # First frame in occupied state — just seed it
+                        ref_frame["frame"]      = small_frame.copy()
+                        ref_frame["updated_at"] = now
+                    else:
+                        # Compare current against reference
+                        diff         = cv2.absdiff(small_frame, ref_frame["frame"])
+                        motion_score = int(diff.sum())
+
+                        if motion_score > MOTION_THRESHOLD and _cooldown_expired(florence_state):
+                            logger.info(
+                                f"[MOTION] Score {motion_score:,} > threshold — "
+                                f"triggering Florence"
+                            )
+                            activity_event = {
+                                "type":      "activity_change",
+                                "timestamp": now,
+                            }
+                            florence_state["last_trigger_at"] = now
+                            threading.Thread(
+                                target=on_event_triggered,
+                                args=(activity_event, latest_frame, florence_state, scene),
+                                daemon=True
+                            ).start()
+
+                        # Always advance reference so it tracks gradual changes
+                        ref_frame["frame"]      = small_frame.copy()
+                        ref_frame["updated_at"] = now
+
+            else:
+                # Room empty — clear reference so it reseeds on next entry
+                ref_frame["frame"]      = None
+                ref_frame["updated_at"] = 0.0
+
+            # --- Per-detection logging ---
             for det in detections:
                 if det["class_name"] in trigger_classes:
-                    db.log_detection(
-                        scene=config["scene"]["active"],
-                        detection=det
-                    )
-            
-            # Periodic stats logging
+                    db.log_detection(scene=scene, detection=det)
+
+            # --- Periodic stats ---
             now = time.time()
             if now - last_stats_log >= stats_interval:
-                fps = fps_counter.fps
-                ram_mb = mem_monitor.process_mb()
+                fps     = fps_counter.fps
+                ram_mb  = mem_monitor.process_mb()
                 ram_pct = mem_monitor.system_percent()
                 db.log_stats(fps, ram_mb, ram_pct)
                 logger.info(f"FPS: {fps:.1f} | {mem_monitor.report()}")
