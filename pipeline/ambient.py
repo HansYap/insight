@@ -192,7 +192,6 @@ def run(source=None, loop=False):
                         # side-by-side: ref | current | diff (amplified)
                         diff_amplified = cv2.convertScaleAbs(diff, alpha=5)
                         diff_color     = cv2.applyColorMap(diff_amplified, cv2.COLORMAP_HOT)
-                        ref_color      = cv2.cvtColor(ref_frame["frame"], cv2.COLOR_BGR2BGR)  # no-op, keeps shape
                         composite      = cv2.hconcat([ref_frame["frame"], small_frame, diff_color])
                         label_text     = (
                             f"score={motion_score:,} thresh={MOTION_THRESHOLD:,} "
