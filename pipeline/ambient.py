@@ -13,6 +13,7 @@ from utils.memory_monitor import MemoryMonitor
 from core.room_state import RoomStateTracker, RoomState
 from core.frame_client import send_frame_for_description, queue_pending
 
+ROOT = Path(__file__).parent.parent
 # Motion delta config
 MOTION_THRESHOLD    = 500_000   # tune: lower = more sensitive (320x240 frame)
 MOTION_COOLDOWN_SEC = 45        # min seconds between Florence re-triggers while occupied
@@ -35,7 +36,6 @@ def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict, sc
     if frame is None:
         return
 
-    ROOT = Path(__file__).parent.parent
     save_dir = ROOT / "debug_frames"
     save_dir.mkdir(exist_ok=True)
     timestamp = int(event["timestamp"])
@@ -122,6 +122,8 @@ def run(source=None, loop=False):
     # Motion delta state
     ref_frame = {"frame": None, "updated_at": 0.0}
 
+    motion_debug_count = {"n": 0}
+
     try:
         while True:
             ret, frame = cap.read()
@@ -162,22 +164,51 @@ def run(source=None, loop=False):
             elif room_state in (RoomState.OCCUPIED, RoomState.JUST_ENTERED):
                 now = time.time()
 
-                # Refresh reference frame periodically
                 if now - ref_frame["updated_at"] > REFERENCE_UPDATE_SECS:
                     if ref_frame["frame"] is None:
-                        # First frame in occupied state — just seed it
                         ref_frame["frame"]      = small_frame.copy()
                         ref_frame["updated_at"] = now
+                        logger.debug("[MOTION] Reference seeded (first frame in occupied state)")
                     else:
-                        # Compare current against reference
                         diff         = cv2.absdiff(small_frame, ref_frame["frame"])
                         motion_score = int(diff.sum())
+                        cooldown_ok  = _cooldown_expired(florence_state)
 
-                        if motion_score > MOTION_THRESHOLD and _cooldown_expired(florence_state):
+                        # ── DEBUG: always log the score and cooldown state ──────────
+                        since_trigger   = now - florence_state["last_trigger_at"]
+                        since_confident = now - florence_state["last_confident_at"]
+                        logger.debug(
+                            f"[MOTION] score={motion_score:,} | threshold={MOTION_THRESHOLD:,} | "
+                            f"score_ok={motion_score > MOTION_THRESHOLD} | cooldown_ok={cooldown_ok} | "
+                            f"since_trigger={since_trigger:.1f}s | since_confident={since_confident:.1f}s"
+                        )
+
+                        # ── DEBUG: save diff visualisation every check ───────────────
+                        n = motion_debug_count["n"]
+                        motion_debug_count["n"] += 1
+                        debug_dir = ROOT / "debug_frames" / "motion"
+                        debug_dir.mkdir(parents=True, exist_ok=True)
+
+                        # side-by-side: ref | current | diff (amplified)
+                        diff_amplified = cv2.convertScaleAbs(diff, alpha=5)
+                        diff_color     = cv2.applyColorMap(diff_amplified, cv2.COLORMAP_HOT)
+                        ref_color      = cv2.cvtColor(ref_frame["frame"], cv2.COLOR_BGR2BGR)  # no-op, keeps shape
+                        composite      = cv2.hconcat([ref_frame["frame"], small_frame, diff_color])
+                        label_text     = (
+                            f"score={motion_score:,} thresh={MOTION_THRESHOLD:,} "
+                            f"cooldown={'ok' if cooldown_ok else 'BLOCKED'}"
+                        )
+                        cv2.putText(composite, label_text, (5, 20),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
+                        cv2.imwrite(str(debug_dir / f"motion_{n:04d}.jpg"), composite)
+                        # ─────────────────────────────────────────────────────────────
+
+                        if motion_score > MOTION_THRESHOLD and cooldown_ok:
                             logger.info(
-                                f"[MOTION] Score {motion_score:,} > threshold — "
-                                f"triggering Florence"
+                                f"[MOTION] TRIGGERED — score {motion_score:,} > threshold, "
+                                f"saving trigger frame"
                             )
+                            cv2.imwrite(str(debug_dir / f"TRIGGER_{n:04d}.jpg"), composite)
                             activity_event = {
                                 "type":      "activity_change",
                                 "timestamp": now,
@@ -188,13 +219,18 @@ def run(source=None, loop=False):
                                 args=(activity_event, latest_frame, florence_state, scene),
                                 daemon=True
                             ).start()
+                        else:
+                            reason = []
+                            if motion_score <= MOTION_THRESHOLD:
+                                reason.append(f"score {motion_score:,} <= threshold {MOTION_THRESHOLD:,}")
+                            if not cooldown_ok:
+                                reason.append(f"cooldown not expired (need {MOTION_COOLDOWN_SEC}s since trigger, {since_trigger:.1f}s elapsed)")
+                            logger.debug(f"[MOTION] No trigger — {' AND '.join(reason)}")
 
-                        # Always advance reference so it tracks gradual changes
                         ref_frame["frame"]      = small_frame.copy()
                         ref_frame["updated_at"] = now
 
             else:
-                # Room empty — clear reference so it reseeds on next entry
                 ref_frame["frame"]      = None
                 ref_frame["updated_at"] = 0.0
 
