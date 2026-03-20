@@ -6,66 +6,246 @@
 <title>Insight Inbox</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
-  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 24px; }
-  .empty { color: #444; text-align: center; padding: 80px; font-size: 1rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
-  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; overflow: hidden; }
-  .card img { width: 100%; height: 200px; object-fit: cover; display: block; background: #111; }
-  .card-body { padding: 14px; }
-  .event-badge { 
-    display: inline-block; font-size: 0.7rem; font-weight: 600;
-    padding: 2px 8px; border-radius: 99px; margin-bottom: 10px;
-    background: #1e3a2f; color: #4ade80;
+
+  body {
+    font-family: 'Berkeley Mono', 'Fira Mono', 'Courier New', monospace;
+    background: #0a0a0a;
+    color: #c8c8c8;
+    padding: 28px 24px;
+    min-height: 100vh;
   }
-  .event-badge.left { background: #3a1e1e; color: #f87171; }
-  .description { font-size: 0.8rem; color: #999; line-height: 1.5; margin-bottom: 12px; max-height: 80px; overflow-y: auto; }
-  .score { font-size: 0.72rem; color: #555; margin-bottom: 12px; }
-  .field-row { display: flex; gap: 8px; margin-bottom: 6px; }
-  .field-row input {
-    flex: 1; background: #111; border: 1px solid #333; border-radius: 6px;
-    padding: 8px 10px; color: #e0e0e0; font-size: 0.85rem; outline: none;
+
+  /* ── Header ─────────────────────────────────────────────── */
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
   }
-  .field-row input:focus { border-color: #4ade80; }
-  .preview-label { font-size: 0.75rem; color: #4ade80; min-height: 16px; }
-  .btn { 
-    padding: 8px 14px; border: none; border-radius: 6px; font-size: 0.8rem;
-    cursor: pointer; font-weight: 600; transition: opacity 0.15s;
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #e8e8e8;
   }
-  .btn:hover { opacity: 0.8; }
-  .btn-label { background: #4ade80; color: #0f0f0f; }
-  .btn-dismiss { background: #2a2a2a; color: #666; }
-  .timestamp { font-size: 0.7rem; color: #444; margin-top: 10px; }
-  .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-  .count-badge { background: #1e3a2f; color: #4ade80; font-size: 0.8rem; padding: 4px 12px; border-radius: 99px; }
-  .refresh-btn { background: none; border: 1px solid #333; color: #666; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; }
-  .refresh-btn:hover { border-color: #555; color: #999; }
-  .labels-header { font-size: 0.72rem; color: #555; margin-bottom: 8px; }
+  h1 span { color: #3ddc84; }
+  .subtitle { color: #444; font-size: 0.75rem; letter-spacing: 0.06em; margin-bottom: 20px; }
+
+  .header-controls { display: flex; gap: 8px; align-items: center; }
+  .count-badge {
+    font-family: inherit;
+    background: #0f1f16;
+    border: 1px solid #1c3a28;
+    color: #3ddc84;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 4px 12px;
+    border-radius: 2px;
+  }
+  .refresh-btn {
+    font-family: inherit;
+    background: none;
+    border: 1px solid #222;
+    color: #444;
+    border-radius: 2px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .refresh-btn:hover { border-color: #444; color: #888; }
+
+  /* ── Labels panel ───────────────────────────────────────── */
+  .labels-panel { margin-bottom: 20px; }
+  .labels-header {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #333;
+    margin-bottom: 8px;
+  }
   .labels-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .label-chip {
-    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 99px;
-    padding: 4px 10px; font-size: 0.75rem; color: #aaa; cursor: pointer;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 2px;
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    color: #666;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .label-chip:hover { border-color: #3ddc84; color: #3ddc84; }
+  .label-count { color: #333; margin-left: 4px; }
+
+  /* ── Empty state ────────────────────────────────────────── */
+  .empty {
+    color: #2a2a2a;
+    text-align: center;
+    padding: 80px;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    border: 1px solid #161616;
+    border-radius: 4px;
+  }
+
+  /* ── Grid ───────────────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 12px;
+  }
+
+  /* ── Card ───────────────────────────────────────────────── */
+  .card {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #2a2a2a; }
+  .card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+    background: #0a0a0a;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .card-body { padding: 14px; }
+
+  /* ── Badge row ──────────────────────────────────────────── */
+  .badge-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .event-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+  .badge-entered  { background: #0b1f14; border-color: #1a4028; color: #3ddc84; }
+  .badge-left     { background: #1f0b0b; border-color: #401a1a; color: #e05a5a; }
+  .badge-activity { background: #1a150a; border-color: #3a2e10; color: #c8a84a; }
+  .badge-unknown  { background: #141414; border-color: #282828; color: #666; }
+
+  /* ── Context pill ───────────────────────────────────────── */
+  .ctx-pill {
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    color: #3a3a3a;
+    border: 1px solid #1e1e1e;
+    border-radius: 2px;
+    padding: 2px 8px;
+  }
+  .ctx-pill span { color: #555; }
+
+  /* ── Description ────────────────────────────────────────── */
+  .description {
+    font-size: 0.78rem;
+    color: #777;
+    line-height: 1.6;
+    margin-bottom: 10px;
+    max-height: 72px;
+    overflow-y: auto;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Score bar ──────────────────────────────────────────── */
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .score-label { font-size: 0.65rem; letter-spacing: 0.08em; color: #333; text-transform: uppercase; }
+  .score-track {
+    flex: 1;
+    height: 3px;
+    background: #1a1a1a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .score-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .score-num { font-size: 0.65rem; color: #444; min-width: 34px; text-align: right; }
+
+  /* ── Input fields ───────────────────────────────────────── */
+  .field-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .field-row input {
+    flex: 1;
+    background: #0a0a0a;
+    border: 1px solid #1e1e1e;
+    border-radius: 2px;
+    padding: 7px 10px;
+    color: #c8c8c8;
+    font-size: 0.78rem;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+    outline: none;
     transition: border-color 0.15s;
   }
-  .label-chip:hover { border-color: #4ade80; color: #4ade80; }
-  .label-count { color: #444; font-size: 0.68rem; margin-left: 4px; }
+  .field-row input::placeholder { color: #2e2e2e; }
+  .field-row input:focus { border-color: #3ddc84; }
+
+  .preview-label {
+    font-size: 0.7rem;
+    color: #3ddc84;
+    letter-spacing: 0.04em;
+    min-height: 14px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Action row ─────────────────────────────────────────── */
+  .action-row { display: flex; gap: 6px; align-items: center; }
+  .btn {
+    font-family: inherit;
+    padding: 7px 14px;
+    border: 1px solid;
+    border-radius: 2px;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.75; }
+  .btn-label  { background: #3ddc84; border-color: #3ddc84; color: #0a0a0a; font-weight: 600; }
+  .btn-dismiss { background: transparent; border-color: #1e1e1e; color: #333; }
+  .btn-dismiss:hover { border-color: #e05a5a; color: #e05a5a; opacity: 1; }
+
+  .timestamp { font-size: 0.65rem; color: #2a2a2a; margin-top: 10px; letter-spacing: 0.04em; }
 </style>
 </head>
 <body>
 
 <div class="header-row">
   <div>
-    <h1>Jarvis Inbox</h1>
-    <div class="subtitle">Label uncertain events to grow the memory</div>
+    <h1>Insight <span>//</span> Inbox</h1>
+    <div class="subtitle">Label uncertain events — each label grows the memory</div>
   </div>
-  <div style="display:flex; gap:8px; align-items:center;">
+  <div class="header-controls">
     <span class="count-badge" id="count-badge">— pending</span>
-    <button class="refresh-btn" onclick="load()">Refresh</button>
+    <button class="refresh-btn" onclick="load()">↺ Refresh</button>
   </div>
 </div>
 
-<div id="labels-panel" style="margin-bottom: 20px;"></div>
+<div id="labels-panel" class="labels-panel"></div>
 <div id="content"><div class="empty">Loading...</div></div>
 
 <script>
@@ -78,7 +258,6 @@ async function load() {
 async function loadPending() {
   const res = await fetch("/pending");
   const items = await res.json();
-  
   document.getElementById("count-badge").textContent = `${items.length} pending`;
   const content = document.getElementById("content");
 
@@ -87,101 +266,180 @@ async function loadPending() {
     return;
   }
 
-  // newest first
   items.sort((a, b) => b.timestamp - a.timestamp);
-
   content.innerHTML = `<div class="grid">${items.map(renderCard).join("")}</div>`;
 }
 
+function badgeClass(eventType) {
+  if (eventType === "person_entered")  return "badge-entered";
+  if (eventType === "person_left")     return "badge-left";
+  if (eventType === "activity_change") return "badge-activity";
+  return "badge-unknown";
+}
+
+function badgeLabel(eventType) {
+  if (eventType === "person_entered")  return "entered";
+  if (eventType === "person_left")     return "left";
+  if (eventType === "activity_change") return "activity";
+  return eventType;
+}
+
+function scoreColor(score) {
+  // low score = far from threshold = red end; high = near threshold = amber/green
+  if (score >= 0.7) return "#3ddc84";
+  if (score >= 0.4) return "#c8a84a";
+  return "#e05a5a";
+}
+
+function formatHour(h) {
+  if (h === undefined || h === null) return null;
+  const suffix = h >= 12 ? "PM" : "AM";
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display}${suffix}`;
+}
+
 function renderCard(item) {
-  const date = new Date(item.timestamp * 1000).toLocaleString();
-  const isLeft = item.event_type === "person_left";
+  const date   = new Date(item.timestamp * 1000).toLocaleString();
+  const score  = typeof item.score === "number" ? item.score : parseFloat(item.score) || 0;
+  const pct    = Math.round(score * 100);
+  const color  = scoreColor(score);
+  const ctx    = item.context || {};
+  const scene  = ctx.scene  || null;
+  const hour   = ctx.hour   !== undefined ? formatHour(ctx.hour) : null;
+
+  const ctxParts = [];
+  if (scene) ctxParts.push(`<span>scene</span> ${scene}`);
+  if (hour)  ctxParts.push(`<span>at</span> ${hour}`);
+  const ctxPill = ctxParts.length
+    ? `<span class="ctx-pill">${ctxParts.join("  ·  ")}</span>`
+    : "";
+
   return `
     <div class="card" id="card-${item.id}">
       <img src="${item.frame_url}" alt="event frame" loading="lazy">
       <div class="card-body">
-        <div class="event-badge ${isLeft ? 'left' : ''}">${item.event_type}</div>
+
+        <div class="badge-row">
+          <span class="event-badge ${badgeClass(item.event_type)}">${badgeLabel(item.event_type)}</span>
+          ${ctxPill}
+        </div>
+
         <div class="description">${item.description}</div>
-        <div class="score">Confidence score: ${item.score}</div>
-        <!-- replace the old input-row div in renderCard() -->
+
+        <div class="score-row">
+          <span class="score-label">Similarity</span>
+          <div class="score-track">
+            <div class="score-fill" style="width:${pct}%; background:${color}"></div>
+          </div>
+          <span class="score-num" style="color:${color}">${score.toFixed(3)}</span>
+        </div>
+
         <div class="field-row">
-            <input type="text" id="activity-${item.id}" placeholder="Activity (e.g. feeding)" 
-                onfocus="lastFocusedId='${item.id}'" onkeydown="if(event.key==='Enter') document.getElementById('subject-${item.id}').focus()">
-            <input type="text" id="subject-${item.id}" placeholder="Subject (e.g. centipede)"
-                onfocus="lastFocusedId='${item.id}'" onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
+          <input type="text" id="activity-${item.id}" placeholder="activity  (e.g. feeding)"
+            onfocus="lastFocusedId='${item.id}'"
+            oninput="updatePreview('${item.id}')"
+            onkeydown="if(event.key==='Enter') document.getElementById('subject-${item.id}').focus()">
+          <input type="text" id="subject-${item.id}" placeholder="subject  (e.g. centipede)"
+            onfocus="lastFocusedId='${item.id}'"
+            oninput="updatePreview('${item.id}')"
+            onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
         </div>
+
         <div class="preview-label" id="preview-${item.id}"></div>
-        <div class="input-row" style="margin-top:8px;">
-            <button class="btn btn-label" onclick="submitLabel('${item.id}')">Save</button>
-            <button class="btn btn-dismiss" onclick="dismiss('${item.id}')">✕</button>
+
+        <div class="action-row">
+          <button class="btn btn-label"   onclick="submitLabel('${item.id}')">Save</button>
+          <button class="btn btn-dismiss" onclick="dismiss('${item.id}')">Dismiss</button>
         </div>
+
         <div class="timestamp">${date}</div>
       </div>
     </div>`;
 }
 
+function updatePreview(id) {
+  const activity = document.getElementById(`activity-${id}`).value.trim();
+  const subject  = document.getElementById(`subject-${id}`).value.trim();
+  const preview  = document.getElementById(`preview-${id}`);
+  preview.textContent = activity ? `→ "${[activity, subject].filter(Boolean).join(" ")}"` : "";
+}
+
 async function submitLabel(id) {
   const activity = document.getElementById(`activity-${id}`).value.trim();
-  const subject = document.getElementById(`subject-${id}`).value.trim();
-  if (!activity) return;
+  const subject  = document.getElementById(`subject-${id}`).value.trim();
+  if (!activity) {
+    document.getElementById(`activity-${id}`).focus();
+    return;
+  }
 
   const form = new FormData();
   form.append("activity", activity);
   form.append("subject", subject);
 
-  const res = await fetch(`/label/${id}`, { method: "POST", body: form });
+  const res  = await fetch(`/label/${id}`, { method: "POST", body: form });
   const data = await res.json();
-  
-  // show what label was actually stored (may have been normalized)
-  const preview = document.getElementById(`preview-${id}`);
-  if (data.label !== `${activity} ${subject}`.trim()) {
+
+  const composed = [activity, subject].filter(Boolean).join(" ");
+  const preview  = document.getElementById(`preview-${id}`);
+  if (data.label && data.label !== composed) {
     preview.textContent = `→ normalized to: "${data.label}"`;
-    await new Promise(r => setTimeout(r, 1500)); // let them see it
+    await new Promise(r => setTimeout(r, 1400));
   }
 
-  document.getElementById(`card-${id}`).remove();
+  removeCard(id);
+  loadLabels(); // refresh chips so new label appears immediately
+}
+
+async function dismiss(id) {
+  await fetch(`/dismiss/${id}`, { method: "DELETE" });
+  removeCard(id);
+}
+
+function removeCard(id) {
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.remove();
   const remaining = document.querySelectorAll(".card").length;
   document.getElementById("count-badge").textContent = `${remaining} pending`;
   if (remaining === 0) load();
 }
 
 async function loadLabels() {
-  const res = await fetch("/labels");
+  const res  = await fetch("/labels");
   const data = await res.json();
-  
-  if (data.labels.length === 0) return;
-  
   const container = document.getElementById("labels-panel");
+
+  if (!data.labels || data.labels.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
   container.innerHTML = `
-    <div class="labels-header">Existing labels — click to copy</div>
+    <div class="labels-header">Existing labels — click to fill</div>
     <div class="labels-list">
       ${data.labels.map(l => `
-        <span class="label-chip" onclick="copyLabel('${l.label}')">
-          ${l.label} <span class="label-count">${l.count}</span>
-        </span>
-      `).join("")}
+        <span class="label-chip" onclick="fillLabel('${escapeAttr(l.label)}')">
+          ${escapeHtml(l.label)}<span class="label-count">${l.count}</span>
+        </span>`).join("")}
     </div>`;
 }
 
-function copyLabel(label) {
-  // split into activity + subject and fill whichever card input is focused
-  // or just fill the last focused card's activity field
-  const parts = label.split(" ");
-  const activity = parts[0] || "";
-  const subject = parts.slice(1).join(" ") || "";
-  
-  if (lastFocusedId) {
-    document.getElementById(`activity-${lastFocusedId}`).value = activity;
-    document.getElementById(`subject-${lastFocusedId}`).value = subject;
-  }
+function fillLabel(label) {
+  if (!lastFocusedId) return;
+  // First word → activity, everything after → subject
+  // Handles multi-word subjects like "centipede enclosure" correctly
+  const spaceIdx = label.indexOf(" ");
+  const activity = spaceIdx === -1 ? label      : label.slice(0, spaceIdx);
+  const subject  = spaceIdx === -1 ? ""         : label.slice(spaceIdx + 1);
+  document.getElementById(`activity-${lastFocusedId}`).value = activity;
+  document.getElementById(`subject-${lastFocusedId}`).value  = subject;
+  updatePreview(lastFocusedId);
 }
 
-async function dismiss(id) {
-  await fetch(`/dismiss/${id}`, { method: "DELETE" });
-  document.getElementById(`card-${id}`).remove();
-  const remaining = document.querySelectorAll(".card").length;
-  document.getElementById("count-badge").textContent = `${remaining} pending`;
-  if (remaining === 0) load();
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function escapeAttr(s) {
+  return s.replace(/'/g, "\\'");
 }
 
 load();
