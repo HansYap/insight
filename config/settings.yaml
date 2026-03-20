@@ -49,5 +49,5 @@ database:
   log_fps_interval: 60         # Log system stats every 60s
 
 scene:
-  active: "default"
+  active: "bedroom"
   roi_enabled: false           # Region of interest masking — Phase 1.5
