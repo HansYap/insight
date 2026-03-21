@@ -26,7 +26,7 @@ def load_config(path="config/settings.yaml"):
         return yaml.safe_load(f)
 
 
-def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict, scene: str):
+def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict):
     logger.info(f"[FLORENCE] Querying for event: {event['type']}")
 
     if event["type"] == "person_entered":
@@ -42,12 +42,7 @@ def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict, sc
     save_path = save_dir / f"{event['type']}_{timestamp}.jpg"
     cv2.imwrite(str(save_path), frame)
 
-    context = {
-        "scene": scene,
-        "hour": datetime.now().hour,
-    }
-
-    result = send_frame_for_description(frame, context=context)
+    result = send_frame_for_description(frame)
 
     if "error" in result:
         logger.warning(f"[FLORENCE] Failed: {result['error']}")
@@ -63,7 +58,7 @@ def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict, sc
         # Extend cooldown — confident recognition, stay quiet longer
         florence_state["last_confident_at"] = time.time()
     else:
-        queue_result = queue_pending(frame, description, event["type"], score, context=context)
+        queue_result = queue_pending(frame, description, event["type"], score)
         logger.info(
             f"[INSIGHT] Uncertain ({score}) — queued for inbox. "
             f"{queue_result.get('total_pending', '?')} pending."
@@ -83,7 +78,6 @@ def _cooldown_expired(florence_state: dict) -> bool:
 def run(source=None, loop=False):
     config = load_config()
     cam_cfg = config["camera"]
-    scene   = config["scene"]["active"]
 
     video_source = source if source is not None else cam_cfg["source"]
 
@@ -103,7 +97,7 @@ def run(source=None, loop=False):
         logger.error(f"Cannot open video source: {video_source}")
         return
 
-    logger.info(f"Pipeline started | Source: {video_source} | Scene: {scene}")
+    logger.info(f"Pipeline started | Source: {video_source}")
     logger.info(f"Initial RAM: {mem_monitor.report()}")
 
     trigger_classes  = set(config["detection"]["trigger_classes"])
@@ -153,7 +147,7 @@ def run(source=None, loop=False):
                 florence_state["last_trigger_at"] = time.time()
                 threading.Thread(
                     target=on_event_triggered,
-                    args=(event, latest_frame, florence_state, scene),
+                    args=(event, latest_frame, florence_state),
                     daemon=True
                 ).start()
                 # Fresh reference after a state-change trigger
@@ -215,7 +209,7 @@ def run(source=None, loop=False):
                             florence_state["last_trigger_at"] = now
                             threading.Thread(
                                 target=on_event_triggered,
-                                args=(activity_event, latest_frame, florence_state, scene),
+                                args=(activity_event, latest_frame, florence_state),
                                 daemon=True
                             ).start()
                         else:
@@ -236,7 +230,7 @@ def run(source=None, loop=False):
             # --- Per-detection logging ---
             for det in detections:
                 if det["class_name"] in trigger_classes:
-                    db.log_detection(scene=scene, detection=det)
+                    db.log_detection(detection=det)
 
             # --- Periodic stats ---
             now = time.time()

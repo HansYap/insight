@@ -46,7 +46,7 @@ class EventDatabase:
             """)
         logger.info(f"Database ready at {self.db_path}")
 
-    def log_detection(self, scene: str, detection: dict):
+    def log_detection(self, detection: dict):
         b = detection["bbox"]
         try:
             with self.conn: # This acts as a transaction context
@@ -54,7 +54,7 @@ class EventDatabase:
                     """INSERT INTO detections 
                        (scene, class_name, confidence, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (scene, detection["class_name"], detection["confidence"], *b)
+                    (detection["class_name"], detection["confidence"], *b)
                 )
         except Exception as e:
             logger.error(f"Failed to log detection: {e}")
