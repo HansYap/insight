@@ -291,27 +291,18 @@ function scoreColor(score) {
   return "#e05a5a";
 }
 
-function formatHour(h) {
-  if (h === undefined || h === null) return null;
-  const suffix = h >= 12 ? "PM" : "AM";
-  const display = h % 12 === 0 ? 12 : h % 12;
-  return `${display}${suffix}`;
-}
 
 function renderCard(item) {
   const date   = new Date(item.timestamp * 1000).toLocaleString();
   const score  = typeof item.score === "number" ? item.score : parseFloat(item.score) || 0;
   const pct    = Math.round(score * 100);
   const color  = scoreColor(score);
-  const ctx    = item.context || {};
-  const scene  = ctx.scene  || null;
-  const hour   = ctx.hour   !== undefined ? formatHour(ctx.hour) : null;
+  // scene is always "" at queue time — human fills it in the inbox
+  // only show the pill if somehow a scene was pre-populated (future use)
+  const scene  = item.scene || null;
 
-  const ctxParts = [];
-  if (scene) ctxParts.push(`<span>scene</span> ${scene}`);
-  if (hour)  ctxParts.push(`<span>at</span> ${hour}`);
-  const ctxPill = ctxParts.length
-    ? `<span class="ctx-pill">${ctxParts.join("  ·  ")}</span>`
+  const ctxPill = scene
+    ? `<span class="ctx-pill"><span>scene</span> ${scene}</span>`
     : "";
 
   return `
@@ -343,6 +334,10 @@ function renderCard(item) {
             onfocus="lastFocusedId='${item.id}'"
             oninput="updatePreview('${item.id}')"
             onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
+          <input type="text" id="scene-${item.id}" placeholder="scene  (e.g. bedroom)"
+            onfocus="lastFocusedId='${item.id}'"
+            oninput="updatePreview('${item.id}')"
+            onkeydown="if(event.key==='Enter') submitLabel('${item.id}')">
         </div>
 
         <div class="preview-label" id="preview-${item.id}"></div>
@@ -360,13 +355,17 @@ function renderCard(item) {
 function updatePreview(id) {
   const activity = document.getElementById(`activity-${id}`).value.trim();
   const subject  = document.getElementById(`subject-${id}`).value.trim();
+  const scene    = document.getElementById(`scene-${id}`).value.trim();
   const preview  = document.getElementById(`preview-${id}`);
-  preview.textContent = activity ? `→ "${[activity, subject].filter(Boolean).join(" ")}"` : "";
+  const parts    = [activity, subject].filter(Boolean).join(" ");
+  const sceneTag = scene ? `  ·  ${scene}` : "";
+  preview.textContent = activity ? `→ "${parts}"${sceneTag}` : "";
 }
 
 async function submitLabel(id) {
   const activity = document.getElementById(`activity-${id}`).value.trim();
   const subject  = document.getElementById(`subject-${id}`).value.trim();
+  const scene  = document.getElementById(`scene-${id}`).value.trim();
   if (!activity) {
     document.getElementById(`activity-${id}`).focus();
     return;
@@ -375,6 +374,7 @@ async function submitLabel(id) {
   const form = new FormData();
   form.append("activity", activity);
   form.append("subject", subject);
+  form.append("scene", scene);
 
   const res  = await fetch(`/label/${id}`, { method: "POST", body: form });
   const data = await res.json();
@@ -425,13 +425,15 @@ async function loadLabels() {
 
 function fillLabel(label) {
   if (!lastFocusedId) return;
-  // First word → activity, everything after → subject
-  // Handles multi-word subjects like "centipede enclosure" correctly
+  // Chips store "activity subject" only — scene is never part of the chip,
+  // the user always types scene manually. Split once: first word = activity,
+  // everything after = subject (handles multi-word subjects correctly).
   const spaceIdx = label.indexOf(" ");
-  const activity = spaceIdx === -1 ? label      : label.slice(0, spaceIdx);
-  const subject  = spaceIdx === -1 ? ""         : label.slice(spaceIdx + 1);
+  const activity = spaceIdx === -1 ? label : label.slice(0, spaceIdx);
+  const subject  = spaceIdx === -1 ? ""   : label.slice(spaceIdx + 1);
   document.getElementById(`activity-${lastFocusedId}`).value = activity;
   document.getElementById(`subject-${lastFocusedId}`).value  = subject;
+  // Scene is intentionally left untouched — user fills it in
   updatePreview(lastFocusedId);
 }
 

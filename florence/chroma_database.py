@@ -18,27 +18,24 @@ class SceneMemory:
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
         print("Memory ready.")
 
-    def _enrich(self, description: str, context: dict | None) -> str:
+    def _enrich(self, description: str, scene: str = "") -> str:
         """
         Prepend scene + hour-of-day to description before embedding.
         e.g. "[bedroom, 22h] A person sitting at a desk with a monitor"
         Context is optional — raw description used if not provided.
         """
-        if not context:
+        if not scene:
             return description
-        scene = context.get("scene", "")
-        hour = context.get("hour", datetime.now().hour)
-        prefix = f"[{scene}, {hour:02d}h] " if scene else f"[{hour:02d}h] "
-        return prefix + description
+        
+        return f"[{scene}] {description}"
 
     def embed(self, text: str) -> list:
         return self.embedder.encode(text).tolist()
 
-    def query(self, description: str, context: dict | None = None) -> dict:
+    def query(self, description: str,) -> dict:
         if self.collection.count() == 0:
             return {"confident": False, "label": None, "score": 0.0}
 
-        enriched = self._enrich(description, context)
         embedding = self.embed(enriched)
 
         results = self.collection.query(
@@ -58,8 +55,7 @@ class SceneMemory:
             "nearest_description": results["documents"][0][0]
         }
 
-    def store(self, description: str, activity: str, subject: str = "",
-              context: dict | None = None) -> str:
+    def store(self, description: str, activity: str, subject: str = "", scene: str = "") -> str:
         label = f"{activity} {subject}".strip()
 
         existing_label = self.find_similar_label(label)
@@ -69,7 +65,7 @@ class SceneMemory:
             activity = parts[0]
             subject = parts[1] if len(parts) > 1 else ""
 
-        enriched = self._enrich(description, context)
+        enriched = self._enrich(description, scene)
         embedding = self.embed(enriched)
         doc_id = f"scene_{int(time.time() * 1000)}"
 
@@ -82,7 +78,7 @@ class SceneMemory:
                 "activity": activity,
                 "subject": subject,
                 "timestamp": time.time(),
-                "scene": context.get("scene", "") if context else "",
+                "scene": scene,
                 "hour": context.get("hour", -1) if context else -1,
             }]
         )

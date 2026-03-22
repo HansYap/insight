@@ -35,15 +35,12 @@ def save_queue(queue: list):
 async def describe_frame(
     frame: UploadFile = File(...),
     prompt: str = Form(default="<MORE_DETAILED_CAPTION>"),
-    scene: str = Form(default=""),
-    hour: int = Form(default=-1),
 ):
     image_bytes = await frame.read()
     result = inferencer.describe(image_bytes, prompt)
     description = result["description"]
 
-    context = {"scene": scene, "hour": hour} if scene or hour >= 0 else None
-    match = memory.query(description, context)
+    match = memory.query(description)
 
     return {
         "description": description,
@@ -58,8 +55,6 @@ async def queue_pending(
     description: str = Form(...),
     event_type: str = Form(...),
     score: float = Form(...),
-    scene: str = Form(default=""),
-    hour: int = Form(default=-1),
 ):
     item_id = str(uuid.uuid4())
     frame_filename = f"{item_id}.jpg"
@@ -72,8 +67,7 @@ async def queue_pending(
         "event_type": event_type,
         "description": description,
         "score": score,
-        "scene": scene,          # stored so labeling can use it
-        "hour": hour,
+        "scene": "",  
         "frame_url": f"/frames/{frame_filename}",
         "timestamp": __import__("time").time()
     })
@@ -87,19 +81,14 @@ def get_pending():
 
 
 @app.post("/label/{item_id}")
-async def label_item(item_id: str, activity: str = Form(...), subject: str = Form(...)):
+async def label_item(item_id: str, activity: str = Form(...), subject: str = Form(...), scene: str = Form(...),):
     queue = load_queue()
     item = next((i for i in queue if i["id"] == item_id), None)
 
     if not item:
         return {"error": "Item not found"}
 
-    # Reconstruct context from stored metadata
-    context = None
-    if item.get("scene") or item.get("hour", -1) >= 0:
-        context = {"scene": item.get("scene", ""), "hour": item.get("hour", -1)}
-
-    used_label = memory.store(item["description"], activity, subject, context)
+    used_label = memory.store(item["description"], activity, subject, scene)
 
     queue = [i for i in queue if i["id"] != item_id]
     save_queue(queue)
