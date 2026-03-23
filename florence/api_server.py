@@ -67,7 +67,6 @@ async def queue_pending(
         "event_type": event_type,
         "description": description,
         "score": score,
-        "scene": "",  
         "frame_url": f"/frames/{frame_filename}",
         "timestamp": __import__("time").time()
     })
@@ -81,14 +80,14 @@ def get_pending():
 
 
 @app.post("/label/{item_id}")
-async def label_item(item_id: str, activity: str = Form(...), subject: str = Form(...), scene: str = Form(...),):
+async def label_item(item_id: str, activity: str = Form(...), subject: str = Form(...)):
     queue = load_queue()
     item = next((i for i in queue if i["id"] == item_id), None)
 
     if not item:
         return {"error": "Item not found"}
 
-    used_label = memory.store(item["description"], activity, subject, scene)
+    used_label = memory.store(item["description"], activity, subject)
 
     queue = [i for i in queue if i["id"] != item_id]
     save_queue(queue)

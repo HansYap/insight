@@ -55,7 +55,7 @@ def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict):
 
     if confident:
         logger.info(f"[INSIGHT] {label} (confidence: {score})")
-        # Extend cooldown — confident recognition, stay quiet longer
+        # Extend cooldown — confident recognition, stay quiet longer (MAY ENCOUNTER BUG IN FUTURE)
         florence_state["last_confident_at"] = time.time()
     else:
         queue_result = queue_pending(frame, description, event["type"], score)

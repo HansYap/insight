@@ -3,7 +3,6 @@ from sentence_transformers import SentenceTransformer
 from pathlib import Path
 import time
 import numpy as np
-from datetime import datetime
 
 CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
 COLLECTION_NAME = "insight_scenes"
@@ -18,25 +17,18 @@ class SceneMemory:
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
         print("Memory ready.")
 
-    def _enrich(self, description: str, scene: str = "") -> str:
-        """
-        Prepend scene + hour-of-day to description before embedding.
-        e.g. "[bedroom, 22h] A person sitting at a desk with a monitor"
-        Context is optional — raw description used if not provided.
-        """
-        if not scene:
-            return description
-        
-        return f"[{scene}] {description}"
-
     def embed(self, text: str) -> list:
         return self.embedder.encode(text).tolist()
 
-    def query(self, description: str,) -> dict:
+    def query(self, description: str) -> dict:
+        """
+        Query using raw description only.
+        Scene is unknown at query time — the human labels it afterward.
+        """
         if self.collection.count() == 0:
             return {"confident": False, "label": None, "score": 0.0}
 
-        embedding = self.embed(enriched)
+        embedding = self.embed(description)  # raw description, no enrichment
 
         results = self.collection.query(
             query_embeddings=[embedding],
@@ -55,7 +47,7 @@ class SceneMemory:
             "nearest_description": results["documents"][0][0]
         }
 
-    def store(self, description: str, activity: str, subject: str = "", scene: str = "") -> str:
+    def store(self, description: str, activity: str, subject: str = "") -> str:
         label = f"{activity} {subject}".strip()
 
         existing_label = self.find_similar_label(label)
@@ -65,27 +57,26 @@ class SceneMemory:
             activity = parts[0]
             subject = parts[1] if len(parts) > 1 else ""
 
-        enriched = self._enrich(description, scene)
-        embedding = self.embed(enriched)
+        embedding = self.embed(description)
         doc_id = f"scene_{int(time.time() * 1000)}"
 
         self.collection.add(
             ids=[doc_id],
             embeddings=[embedding],
-            documents=[description],   # raw — stays human-readable
+            documents=[description],
             metadatas=[{
                 "label": label,
                 "activity": activity,
                 "subject": subject,
                 "timestamp": time.time(),
-                "scene": scene,
-                "hour": context.get("hour", -1) if context else -1,
             }]
         )
-        print(f"[MEMORY] Stored: '{label}' (embedded as: '{enriched[:60]}...')")
+        print(f"[MEMORY] Stored: '{label}'")
         return label
 
+
     def find_similar_label(self, candidate: str, threshold: float = 0.85) -> str | None:
+        """to collaps similar labels to exisitng ones if over siilarity theshold"""
         if self.collection.count() == 0:
             return None
 
