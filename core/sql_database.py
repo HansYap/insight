@@ -52,7 +52,7 @@ class EventDatabase:
             with self.conn: # This acts as a transaction context
                 self.conn.execute(
                     """INSERT INTO detections 
-                       (scene, class_name, confidence, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
+                       (class_name, confidence, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (detection["class_name"], detection["confidence"], *b)
                 )
