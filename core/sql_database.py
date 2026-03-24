@@ -53,7 +53,7 @@ class EventDatabase:
                 self.conn.execute(
                     """INSERT INTO detections 
                        (class_name, confidence, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?)""",
                     (detection["class_name"], detection["confidence"], *b)
                 )
         except Exception as e:
