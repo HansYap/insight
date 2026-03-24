@@ -67,12 +67,12 @@ def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict):
 
 def _cooldown_expired(florence_state: dict) -> bool:
     now = time.time()
-    since_trigger  = now - florence_state["last_trigger_at"]
+    since_motion    = now - florence_state["last_motion_trigger_at"]
     since_confident = now - florence_state["last_confident_at"]
-    # Respect the longer cooldown if we recently had a confident hit
+
     if since_confident < CONFIDENT_COOLDOWN_SEC:
         return False
-    return since_trigger >= MOTION_COOLDOWN_SEC
+    return since_motion >= MOTION_COOLDOWN_SEC
 
 
 def run(source=None, loop=False):
@@ -109,8 +109,9 @@ def run(source=None, loop=False):
     # Shared state between main loop and Florence threads
     latest_frame  = {"frame": None}
     florence_state = {
-        "last_trigger_at":   0.0,
-        "last_confident_at": 0.0,
+        "last_trigger_at":        0.0,   # entry/exit events
+        "last_motion_trigger_at": 0.0,   # motion delta re-triggers only
+        "last_confident_at":      0.0,
     }
 
     # Motion delta state
@@ -206,7 +207,7 @@ def run(source=None, loop=False):
                                 "type":      "activity_change",
                                 "timestamp": now,
                             }
-                            florence_state["last_trigger_at"] = now
+                            florence_state["last_motion_trigger_at"] = now
                             threading.Thread(
                                 target=on_event_triggered,
                                 args=(activity_event, latest_frame, florence_state),
