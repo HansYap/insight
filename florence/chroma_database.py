@@ -12,7 +12,7 @@ class SceneMemory:
     def __init__(self):
         CHROMA_PATH.mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(path=str(CHROMA_PATH))
-        self.collection = self.client.get_or_create_collection(COLLECTION_NAME)
+        self.collection = self.client.get_or_create_collection(COLLECTION_NAME, metadata={"hnsw:space": "cosine"})
         print("Loading sentence transformer...")
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
         print("Memory ready.")
