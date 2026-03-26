@@ -128,6 +128,23 @@ def dismiss_item(item_id: str):
     return {"dismissed": True}
 
 
+@app.post("/save_frame")
+async def save_frame(request: Request):
+    body = await request.json()
+    rel_path = body["path"]          # e.g. "motion/TRIGGER_0001.jpg"
+    img_b64  = body["image"]
+
+    import base64, numpy as np
+    img_bytes = base64.b64decode(img_b64)
+    img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+    frame     = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+    save_path = Path("debug_frames") / rel_path
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(save_path), frame)
+    return {"saved": str(save_path)}
+
+
 @app.get("/inbox", response_class=HTMLResponse)
 def inbox_ui():
     return HTMLResponse(content=open(

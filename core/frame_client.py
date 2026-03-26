@@ -41,3 +41,16 @@ def queue_pending(frame, description: str, event_type: str, score: float):
         return response.json()
     except Exception as e:
         return {"error": str(e)}
+
+
+def save_frame_remote(frame, rel_path: str):
+    _, buf = cv2.imencode(".jpg", frame)
+    img_b64 = base64.b64encode(buf).decode()
+    try:
+        requests.post(
+            f"{THINKPAD_URL}/save_frame",
+            json={"path": rel_path, "image": img_b64},
+            timeout=5
+        )
+    except Exception as e:
+        logger.warning(f"[REMOTE SAVE] Failed: {e}")
