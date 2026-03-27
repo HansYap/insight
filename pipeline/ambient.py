@@ -39,8 +39,8 @@ def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict):
     save_dir = ROOT / "debug_frames"
     save_dir.mkdir(exist_ok=True)
     timestamp = int(event["timestamp"])
-    save_path = save_dir / f"{event['type']}_{timestamp}.jpg"
-    cv2.imwrite(str(save_path), frame)
+    #save_path = save_dir / f"{event['type']}_{timestamp}.jpg"
+    save_frame_remote(frame, f"{event['type']}_{timestamp}.jpg")
 
     result = send_frame_for_description(frame)
 
@@ -194,7 +194,8 @@ def run(source=None, loop=False):
                         )
                         cv2.putText(composite, label_text, (5, 20),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
-                        cv2.imwrite(str(debug_dir / f"motion_{n:04d}.jpg"), composite)
+                        #cv2.imwrite(str(debug_dir / f"motion_{n:04d}.jpg"), composite)
+                        save_frame_remote(composite, f"motion/motion_{n:04d}.jpg")
                         # ─────────────────────────────────────────────────────────────
 
                         if motion_score > MOTION_THRESHOLD and cooldown_ok:
@@ -202,7 +203,8 @@ def run(source=None, loop=False):
                                 f"[MOTION] TRIGGERED — score {motion_score:,} > threshold, "
                                 f"saving trigger frame"
                             )
-                            cv2.imwrite(str(debug_dir / f"TRIGGER_{n:04d}.jpg"), composite)
+                            #cv2.imwrite(str(debug_dir / f"TRIGGER_{n:04d}.jpg"), composite)
+                            save_frame_remote(composite, f"motion/TRIGGER_{n:04d}.jpg")
                             activity_event = {
                                 "type":      "activity_change",
                                 "timestamp": now,
