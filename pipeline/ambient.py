@@ -11,7 +11,7 @@ from core.sql_database import EventDatabase
 from utils.fps_counter import FPSCounter
 from utils.memory_monitor import MemoryMonitor
 from core.room_state import RoomStateTracker, RoomState
-from core.frame_client import send_frame_for_description, queue_pending
+from core.frame_client import send_frame_for_description, queue_pending, save_frame_remote
 
 ROOT = Path(__file__).parent.parent
 # Motion delta config
