@@ -2,6 +2,7 @@ import requests
 import cv2
 import time
 from datetime import datetime
+import base64
 
 THINKPAD_URL = "http://192.168.68.109:8000"
 

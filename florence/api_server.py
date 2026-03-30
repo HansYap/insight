@@ -8,6 +8,7 @@ import json
 import uuid
 import shutil
 from pathlib import Path
+import base64
 
 
 app = FastAPI()
