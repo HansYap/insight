@@ -3,6 +3,7 @@ import cv2
 import time
 from datetime import datetime
 import base64
+from loguru import logger
 
 THINKPAD_URL = "http://192.168.68.109:8000"
 
@@ -51,7 +52,7 @@ def save_frame_remote(frame, rel_path: str):
         requests.post(
             f"{THINKPAD_URL}/save_frame",
             json={"path": rel_path, "image": img_b64},
-            timeout=5
+            timeout=15
         )
     except Exception as e:
         logger.warning(f"[REMOTE SAVE] Failed: {e}")
