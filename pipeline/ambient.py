@@ -89,6 +89,13 @@ def run(source=None, loop=False):
     state_tracker = RoomStateTracker(empty_grace_seconds=3.0)
 
     cap = cv2.VideoCapture(video_source)
+    #cap = cv2.VideoCapture(0)
+
+    # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    # cap.set(cv2.CAP_PROP_FPS, 30)
+    
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  cam_cfg["width"])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["height"])
     cap.set(cv2.CAP_PROP_BUFFERSIZE,   cam_cfg["buffer_size"])
@@ -195,7 +202,11 @@ def run(source=None, loop=False):
                         cv2.putText(composite, label_text, (5, 20),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
                         #cv2.imwrite(str(debug_dir / f"motion_{n:04d}.jpg"), composite)
-                        save_frame_remote(composite, f"motion/motion_{n:04d}.jpg")
+                        threading.Thread(
+                            target=save_frame_remote,
+                            args=(composite, f"motion/motion_{n:40d}.jpg"),
+                            daemon=True,
+                        ).start()
                         # ─────────────────────────────────────────────────────────────
 
                         if motion_score > MOTION_THRESHOLD and cooldown_ok:
@@ -204,7 +215,11 @@ def run(source=None, loop=False):
                                 f"saving trigger frame"
                             )
                             #cv2.imwrite(str(debug_dir / f"TRIGGER_{n:04d}.jpg"), composite)
-                            save_frame_remote(composite, f"motion/TRIGGER_{n:04d}.jpg")
+                            threading.Thread(
+                                target=save_frame_remote,
+                                args=(composite, f"motion/TRIGGER_{n:40d}.jpg"),
+                                daemon=True,
+                            ).start()
                             activity_event = {
                                 "type":      "activity_change",
                                 "timestamp": now,
