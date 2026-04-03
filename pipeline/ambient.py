@@ -88,17 +88,15 @@ def run(source=None, loop=False):
     mem_monitor = MemoryMonitor()
     state_tracker = RoomStateTracker(empty_grace_seconds=3.0)
 
-    cap = cv2.VideoCapture(video_source)
-    #cap = cv2.VideoCapture(0)
+    # for video source
+    #cap = cv2.VideoCapture(video_source)
+    cap = cv2.VideoCapture(0)
 
-    # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    # cap.set(cv2.CAP_PROP_FPS, 30)
-    
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  cam_cfg["width"])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["height"])
-    cap.set(cv2.CAP_PROP_BUFFERSIZE,   cam_cfg["buffer_size"])
+    cap.set(cv2.CAP_PROP_FPS,   cam_cfg["fps_target"])
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, cam_cfg["buffer_size"])
 
     if not cap.isOpened():
         logger.error(f"Cannot open video source: {video_source}")

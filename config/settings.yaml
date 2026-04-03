@@ -9,7 +9,7 @@ camera:
   source: 0                    # 0 = first USB webcam, or "/dev/video0"
   width: 640
   height: 480
-  fps_target: 15               # Request this from webcam, don't expect it
+  fps_target: 30               # Request this from webcam, don't expect it
   buffer_size: 1               # Critical: set to 1 to prevent frame lag
 
 models:
