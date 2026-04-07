@@ -268,7 +268,7 @@ def run(source=None, loop=False):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("source")
+    parser.add_argument("source", nargs="?", default=None)
     parser.add_argument("--loop", action="store_true")
     args = parser.parse_args()
     run(source=args.source, loop=args.loop)
