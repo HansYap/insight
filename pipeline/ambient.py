@@ -2,8 +2,9 @@ import cv2
 import yaml
 import time
 import threading
+import collections
 from pathlib import Path
-from datetime import datetime
+from dataclasses import dataclass, field
 from loguru import logger
 
 from core.detector import ObjectDetector
@@ -14,89 +15,264 @@ from core.room_state import RoomStateTracker, RoomState
 from core.frame_client import send_frame_for_description, queue_pending, save_frame_remote
 
 ROOT = Path(__file__).parent.parent
-# Motion delta config
-MOTION_THRESHOLD    = 500_000   # tune: lower = more sensitive (320x240 frame)
-MOTION_COOLDOWN_SEC = 45        # min seconds between Florence re-triggers while occupied
-CONFIDENT_COOLDOWN_SEC = 90     # longer cooldown after a confident recognition
-REFERENCE_UPDATE_SECS = 5       # how often to refresh the reference frame
 
 
-def load_config(path="config/settings.yaml"):
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+def load_config(path="config/settings.yaml") -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
 
 
-def on_event_triggered(event: dict, latest_frame: dict, florence_state: dict):
-    logger.info(f"[FLORENCE] Querying for event: {event['type']}")
+# ---------------------------------------------------------------------------
+# Data classes — no more raw dicts with string keys
+# ---------------------------------------------------------------------------
 
-    if event["type"] == "person_entered":
-        time.sleep(3.0)
+@dataclass
+class MotionConfig:
+    threshold: int   = 500_000  # lower = more sensitive (320×240 frame)
+    reference_update_secs: int = 5
 
-    frame = latest_frame["frame"]
-    if frame is None:
-        return
 
-    save_dir = ROOT / "debug_frames"
-    save_dir.mkdir(exist_ok=True)
-    timestamp = int(event["timestamp"])
-    #save_path = save_dir / f"{event['type']}_{timestamp}.jpg"
-    save_frame_remote(frame, f"{event['type']}_{timestamp}.jpg")
+@dataclass
+class FlorenceConfig:
+    motion_cooldown_sec: int    = 45
+    confident_cooldown_sec: int = 90
+    person_entry_delay_sec: float = 3.0
 
-    result = send_frame_for_description(frame)
 
-    if "error" in result:
-        logger.warning(f"[FLORENCE] Failed: {result['error']}")
-        return
+@dataclass
+class FlorenceState:
+    last_trigger_at:        float = 0.0  # entry/exit events
+    last_motion_trigger_at: float = 0.0  # motion delta re-triggers only
+    last_confident_at:      float = 0.0
 
-    description = result.get("description", "")
-    confident   = result.get("confident", False)
-    label       = result.get("label", "")
-    score       = result.get("score", 0.0)
 
-    if confident:
-        logger.info(f"[INSIGHT] {label} (confidence: {score})")
-        # Extend cooldown — confident recognition, stay quiet longer (MAY ENCOUNTER BUG IN FUTURE)
-        florence_state["last_confident_at"] = time.time()
-    else:
-        queue_result = queue_pending(frame, description, event["type"], score)
-        logger.info(
-            f"[INSIGHT] Uncertain ({score}) — queued for inbox. "
-            f"{queue_result.get('total_pending', '?')} pending."
+# ---------------------------------------------------------------------------
+# MotionDetector — owns reference frame, scoring, cooldown, debug saves
+# ---------------------------------------------------------------------------
+
+class MotionDetector:
+    """
+    Compares successive small frames to detect significant activity change
+    while a person is present. Owns all motion-delta state.
+    """
+
+    def __init__(self, config: MotionConfig):
+        self.config = config
+        self._ref_frame: cv2.typing.MatLike | None = None
+        self._ref_updated_at: float = 0.0
+        self._debug_count: int = 0
+
+    def reset(self) -> None:
+        """Call when room becomes empty — clears stale reference."""
+        self._ref_frame = None
+        self._ref_updated_at = 0.0
+
+    def seed(self, small_frame) -> None:
+        """Call after an entry/exit event to start fresh."""
+        self._ref_frame = small_frame.copy()
+        self._ref_updated_at = time.time()
+
+    def check(self, small_frame, cooldown_ok: bool) -> tuple[bool, int]:
+        """
+        Returns (triggered: bool, motion_score: int).
+        Should be called every frame while room is occupied.
+        Only does the expensive diff when the reference update interval has elapsed.
+        """
+        now = time.time()
+
+        if now - self._ref_updated_at < self.config.reference_update_secs:
+            return False, 0
+
+        if self._ref_frame is None:
+            self._seed_first_reference(small_frame, now)
+            return False, 0
+
+        motion_score = self._compute_score(small_frame)
+        triggered    = motion_score > self.config.threshold and cooldown_ok
+
+        self._log_debug(small_frame, motion_score, cooldown_ok, triggered)
+
+        self._ref_frame     = small_frame.copy()
+        self._ref_updated_at = now
+
+        return triggered, motion_score
+
+    # --- private helpers ----------------------------------------------------
+
+    def _seed_first_reference(self, small_frame, now: float) -> None:
+        self._ref_frame      = small_frame.copy()
+        self._ref_updated_at = now
+        logger.debug("[MOTION] Reference seeded (first frame in occupied state)")
+
+    def _compute_score(self, small_frame) -> int:
+        diff = cv2.absdiff(small_frame, self._ref_frame)
+        return int(diff.sum())
+
+    def _log_debug(self, small_frame, motion_score: int, cooldown_ok: bool, triggered: bool) -> None:
+        n = self._debug_count
+        self._debug_count += 1
+
+        logger.debug(
+            f"[MOTION] score={motion_score:,} | threshold={self.config.threshold:,} | "
+            f"score_ok={motion_score > self.config.threshold} | cooldown_ok={cooldown_ok}"
         )
 
+        diff           = cv2.absdiff(small_frame, self._ref_frame)
+        diff_amplified = cv2.convertScaleAbs(diff, alpha=5)
+        diff_color     = cv2.applyColorMap(diff_amplified, cv2.COLORMAP_HOT)
+        composite      = cv2.hconcat([self._ref_frame, small_frame, diff_color])
+        label_text     = (
+            f"score={motion_score:,} thresh={self.config.threshold:,} "
+            f"cooldown={'ok' if cooldown_ok else 'BLOCKED'}"
+        )
+        cv2.putText(composite, label_text, (5, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
 
-def _cooldown_expired(florence_state: dict) -> bool:
-    now = time.time()
-    since_motion    = now - florence_state["last_motion_trigger_at"]
-    since_confident = now - florence_state["last_confident_at"]
-
-    if since_confident < CONFIDENT_COOLDOWN_SEC:
-        return False
-    return since_motion >= MOTION_COOLDOWN_SEC
+        prefix = "TRIGGER" if triggered else "motion"
+        threading.Thread(
+            target=save_frame_remote,
+            args=(composite, f"motion/{prefix}_{n:04d}.jpg"),
+            daemon=True,
+        ).start()
 
 
-def run(source=None, loop=False):
-    config = load_config()
+# ---------------------------------------------------------------------------
+# EventDispatcher — owns Florence state, threading, inbox queuing
+# ---------------------------------------------------------------------------
+
+class EventDispatcher:
+    """
+    Dispatches triggered events to Florence-2 in background threads.
+    Owns cooldown state and the human-in-the-loop inbox queue logic.
+    """
+
+    def __init__(self, config: FlorenceConfig):
+        self.config = config
+        self._state = FlorenceState()
+
+    # Public interface -------------------------------------------------------
+
+    def dispatch(self, event: dict, latest_frame: dict) -> None:
+        """Fire-and-forget: spawns a daemon thread per event."""
+        threading.Thread(
+            target=self._handle_event,
+            args=(event, latest_frame),
+            daemon=True,
+        ).start()
+
+    def motion_cooldown_ok(self) -> bool:
+        now = time.time()
+        if now - self._state.last_confident_at < self.config.confident_cooldown_sec:
+            return False
+        return (now - self._state.last_motion_trigger_at) >= self.config.motion_cooldown_sec
+
+    def mark_entry_exit_trigger(self) -> None:
+        self._state.last_trigger_at = time.time()
+
+    def mark_motion_trigger(self) -> None:
+        self._state.last_motion_trigger_at = time.time()
+
+    # Private — runs in background thread ------------------------------------
+
+    def _handle_event(self, event: dict, latest_frame: dict) -> None:
+        logger.info(f"[FLORENCE] Querying for event: {event['type']}")
+
+        if event["type"] == "person_entered":
+            time.sleep(self.config.person_entry_delay_sec)
+
+        frame = latest_frame["frame"]
+        if frame is None:
+            return
+
+        self._save_trigger_frame(frame, event)
+        self._query_florence(frame, event)
+
+    def _save_trigger_frame(self, frame, event: dict) -> None:
+        timestamp = int(event["timestamp"])
+        threading.Thread(
+            target=save_frame_remote,
+            args=(frame, f"{event['type']}_{timestamp}.jpg"),
+            daemon=True,
+        ).start()
+
+    def _query_florence(self, frame, event: dict) -> None:
+        result = send_frame_for_description(frame)
+
+        if "error" in result:
+            logger.warning(f"[FLORENCE] Failed: {result['error']}")
+            return
+
+        description = result.get("description", "")
+        confident   = result.get("confident", False)
+        label       = result.get("label", "")
+        score       = result.get("score", 0.0)
+
+        if confident:
+            logger.info(f"[INSIGHT] {label} (confidence: {score})")
+            self._state.last_confident_at = time.time()
+        else:
+            queue_result = queue_pending(frame, description, event["type"], score)
+            logger.info(
+                f"[INSIGHT] Uncertain ({score:.2f}) — queued for inbox. "
+                f"{queue_result.get('total_pending', '?')} pending."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Farneback (placeholder — implement when ready)
+# ---------------------------------------------------------------------------
+
+def farneback_calculate(frames: list) -> dict | None:
+    """
+    Compute optical flow statistics across a buffer of full-res frames.
+    Returns a dict of scalar stats to be attached to the event record,
+    or None if the buffer is too short.
+
+    Expected output shape (when implemented):
+        {
+            "flow_magnitude_mean": float,
+            "flow_magnitude_std":  float,
+            "flow_dominant_angle": float,
+        }
+    """
+    if len(frames) < 2:
+        return None
+    # TODO: implement
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline loop — thin orchestrator, delegates everything
+# ---------------------------------------------------------------------------
+
+def run(source=None, loop=False) -> None:
+    config  = load_config()
     cam_cfg = config["camera"]
 
     video_source = source if source is not None else cam_cfg["source"]
 
-    detector    = ObjectDetector(config["models"]["yolo"])
+    detector      = ObjectDetector(config["models"]["yolo"])
     detector.load()
-    db          = EventDatabase(config["database"]["path"])
-    fps_counter = FPSCounter(window=30)
-    mem_monitor = MemoryMonitor()
-    state_tracker = RoomStateTracker(empty_grace_seconds=3.0)
+    db            = EventDatabase(config["database"]["path"])
+    # for debug purpose
+    fps_counter   = FPSCounter(window=30)
+    mem_monitor   = MemoryMonitor()
 
-    # for video source
-    #cap = cv2.VideoCapture(video_source)
-    cap = cv2.VideoCapture(0)
+    state_tracker = RoomStateTracker(empty_grace_seconds=5.0)
 
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+    motion    = MotionDetector(MotionConfig())
+    dispatch  = EventDispatcher(FlorenceConfig())
+
+    cap = cv2.VideoCapture(cam_cfg.get("source", 0))
+    cap.set(cv2.CAP_PROP_FOURCC,    cv2.VideoWriter_fourcc(*'MJPG'))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  cam_cfg["width"])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["height"])
-    cap.set(cv2.CAP_PROP_FPS,   cam_cfg["fps_target"])
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, cam_cfg["buffer_size"])
+    cap.set(cv2.CAP_PROP_FPS,          cam_cfg["fps_target"])
+    cap.set(cv2.CAP_PROP_BUFFERSIZE,   cam_cfg["buffer_size"])
 
     if not cap.isOpened():
         logger.error(f"Cannot open video source: {video_source}")
@@ -105,24 +281,18 @@ def run(source=None, loop=False):
     logger.info(f"Pipeline started | Source: {video_source}")
     logger.info(f"Initial RAM: {mem_monitor.report()}")
 
-    trigger_classes  = set(config["detection"]["trigger_classes"])
-    last_stats_log   = time.time()
-    stats_interval   = config["database"]["log_fps_interval"]
-    PROCESS_EVERY_N  = 3
-    frame_count      = 0
+    trigger_classes = set(config["detection"]["trigger_classes"])
+    PROCESS_EVERY_N = 3
+    BUFFER_LENGTH   = 10
+    frame_count     = 0
+    last_stats_log  = time.time()
+    stats_interval  = config["database"]["log_fps_interval"]
 
-    # Shared state between main loop and Florence threads
-    latest_frame  = {"frame": None}
-    florence_state = {
-        "last_trigger_at":        0.0,   # entry/exit events
-        "last_motion_trigger_at": 0.0,   # motion delta re-triggers only
-        "last_confident_at":      0.0,
-    }
+    # account for yolo early trigger
+    latest_frame = {"frame": None}
 
-    # Motion delta state
-    ref_frame = {"frame": None, "updated_at": 0.0}
-
-    motion_debug_count = {"n": 0}
+    # farneback/ v_motion
+    frame_buffer = collections.deque(maxlen=BUFFER_LENGTH)
 
     try:
         while True:
@@ -131,9 +301,8 @@ def run(source=None, loop=False):
                 if loop:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
-                else:
-                    logger.warning("Frame read failed — end of stream or disconnected camera")
-                    break
+                logger.warning("Frame read failed — end of stream or disconnected camera")
+                break
 
             frame_count += 1
             fps_counter.tick()
@@ -143,112 +312,39 @@ def run(source=None, loop=False):
 
             small_frame = cv2.resize(frame, (320, 240))
             detections  = detector.detect(small_frame)
+
             latest_frame["frame"] = frame.copy()
+            frame_buffer.append(frame.copy())
 
             room_state, event = state_tracker.update(detections)
 
-            # --- State-machine triggered events (enter / leave) ---
+            # --- Entry / exit event -----------------------------------------
             if event:
                 db.log_room_event(event)
-                florence_state["last_trigger_at"] = time.time()
-                threading.Thread(
-                    target=on_event_triggered,
-                    args=(event, latest_frame, florence_state),
-                    daemon=True
-                ).start()
-                # Fresh reference after a state-change trigger
-                ref_frame["frame"]      = small_frame.copy()
-                ref_frame["updated_at"] = time.time()
+                dispatch.mark_entry_exit_trigger()
+                dispatch.dispatch(event, latest_frame)
+                farneback_calculate(list(frame_buffer))
+                motion.seed(small_frame)
 
-            # --- Motion delta re-trigger while occupied ---
+            # --- Motion delta while occupied ---------------------------------
             elif room_state in (RoomState.OCCUPIED, RoomState.JUST_ENTERED):
-                now = time.time()
+                triggered, _ = motion.check(small_frame, dispatch.motion_cooldown_ok())
+                if triggered:
+                    activity_event = {"type": "activity_change", "timestamp": time.time()}
+                    dispatch.mark_motion_trigger()
+                    dispatch.dispatch(activity_event, latest_frame)
+                    farneback_calculate(list(frame_buffer))
 
-                if now - ref_frame["updated_at"] > REFERENCE_UPDATE_SECS:
-                    if ref_frame["frame"] is None:
-                        ref_frame["frame"]      = small_frame.copy()
-                        ref_frame["updated_at"] = now
-                        logger.debug("[MOTION] Reference seeded (first frame in occupied state)")
-                    else:
-                        diff         = cv2.absdiff(small_frame, ref_frame["frame"])
-                        motion_score = int(diff.sum())
-                        cooldown_ok  = _cooldown_expired(florence_state)
-
-                        # ── DEBUG: always log the score and cooldown state ──────────
-                        since_trigger   = now - florence_state["last_trigger_at"]
-                        since_confident = now - florence_state["last_confident_at"]
-                        logger.debug(
-                            f"[MOTION] score={motion_score:,} | threshold={MOTION_THRESHOLD:,} | "
-                            f"score_ok={motion_score > MOTION_THRESHOLD} | cooldown_ok={cooldown_ok} | "
-                            f"since_trigger={since_trigger:.1f}s | since_confident={since_confident:.1f}s"
-                        )
-
-                        # ── DEBUG: save diff visualisation every check ───────────────
-                        n = motion_debug_count["n"]
-                        motion_debug_count["n"] += 1
-                        debug_dir = ROOT / "debug_frames" / "motion"
-                        debug_dir.mkdir(parents=True, exist_ok=True)
-
-                        # side-by-side: ref | current | diff (amplified)
-                        diff_amplified = cv2.convertScaleAbs(diff, alpha=5)
-                        diff_color     = cv2.applyColorMap(diff_amplified, cv2.COLORMAP_HOT)
-                        composite      = cv2.hconcat([ref_frame["frame"], small_frame, diff_color])
-                        label_text     = (
-                            f"score={motion_score:,} thresh={MOTION_THRESHOLD:,} "
-                            f"cooldown={'ok' if cooldown_ok else 'BLOCKED'}"
-                        )
-                        cv2.putText(composite, label_text, (5, 20),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
-                        #cv2.imwrite(str(debug_dir / f"motion_{n:04d}.jpg"), composite)
-                        threading.Thread(
-                            target=save_frame_remote,
-                            args=(composite, f"motion/motion_{n:40d}.jpg"),
-                            daemon=True,
-                        ).start()
-                        # ─────────────────────────────────────────────────────────────
-
-                        if motion_score > MOTION_THRESHOLD and cooldown_ok:
-                            logger.info(
-                                f"[MOTION] TRIGGERED — score {motion_score:,} > threshold, "
-                                f"saving trigger frame"
-                            )
-                            #cv2.imwrite(str(debug_dir / f"TRIGGER_{n:04d}.jpg"), composite)
-                            threading.Thread(
-                                target=save_frame_remote,
-                                args=(composite, f"motion/TRIGGER_{n:40d}.jpg"),
-                                daemon=True,
-                            ).start()
-                            activity_event = {
-                                "type":      "activity_change",
-                                "timestamp": now,
-                            }
-                            florence_state["last_motion_trigger_at"] = now
-                            threading.Thread(
-                                target=on_event_triggered,
-                                args=(activity_event, latest_frame, florence_state),
-                                daemon=True
-                            ).start()
-                        else:
-                            reason = []
-                            if motion_score <= MOTION_THRESHOLD:
-                                reason.append(f"score {motion_score:,} <= threshold {MOTION_THRESHOLD:,}")
-                            if not cooldown_ok:
-                                reason.append(f"cooldown not expired (need {MOTION_COOLDOWN_SEC}s since trigger, {since_trigger:.1f}s elapsed)")
-                            logger.debug(f"[MOTION] No trigger — {' AND '.join(reason)}")
-
-                        ref_frame["frame"]      = small_frame.copy()
-                        ref_frame["updated_at"] = now
-
+            # --- Room empty --------------------------------------------------
             else:
-                ref_frame["frame"]      = None
-                ref_frame["updated_at"] = 0.0
+                motion.reset()
 
-            # --- Per-detection logging ---
+            # --- Per-detection logging ---------------------------------------
             for det in detections:
                 if det["class_name"] in trigger_classes:
                     db.log_detection(detection=det)
 
-            # --- Periodic stats ---
+            # --- Periodic stats ---------------------------------------------
             now = time.time()
             if now - last_stats_log >= stats_interval:
                 fps     = fps_counter.fps
