@@ -231,18 +231,51 @@ def farneback_calculate(frames: list) -> dict | None:
     Compute optical flow statistics across a buffer of full-res frames.
     Returns a dict of scalar stats to be attached to the event record,
     or None if the buffer is too short.
-
-    Expected output shape (when implemented):
-        {
-            "flow_magnitude_mean": float,
-            "flow_magnitude_std":  float,
-            "flow_dominant_angle": float,
-        }
     """
+    
     if len(frames) < 2:
         return None
-    # TODO: implement
-    return None
+    
+    flow_store = []
+    COVERAGE_THRESHOLD = 0.5
+
+    for f in range(1, len(frames)):
+        prev_frame = cv.cvtColor(frames[f-1], cv.COLOR_BGR2GRAY)
+        next_frame = cv.cvtColor(frames[f], cv.COLOR_BGR2GRAY)
+
+        flow = cv.calcOpticalFlowFarneback(prev_frame, next_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)  
+        flow_store.append(flow)
+    
+    avg_flow = np.mean(flow_store, axis=0) # (H,W,2)
+    # extract horizontal and vertical displacement per pixel
+    dx = avg_flow[..., 0]
+    dy = avg_flow[..., 1]
+
+    magnitude_pixel = np.hypot(dx, dy)
+    mean_magnitude = np.mean(magnitude_pixel)
+
+    std_magnitude = np.std(magnitude_pixel)
+
+    # calculate directionality
+    angle_pixel = np.arctan2(dy, dx)
+    circular_variance = 1 - np.abs(np.mean(np.exp(1j * angle_pixel)))
+
+    coverage_ratio = np.mean(magnitude_pixel > COVERAGE_THRESHOLD)
+
+    dominant_angle = np.arctan2(np.mean(np.sin(angle_pixel)), np.mean(np.cos(angle_pixel)))
+    dominant_sin = np.sin(dominant_angle)
+    dominant_cos = np.cos(dominant_angle)
+
+    v_motion = {
+        "mean_magnitude": mean_magnitude,
+        "std_magnitude": std_magnitude,
+        "directionality": circular_variance,
+        "coverage_ratio": coverage_ratio,
+        "dominant_sin": dominant_sin,
+        "dominant_cos": dominant_cos,
+    }
+
+    return v_motion
 
 
 # ---------------------------------------------------------------------------
