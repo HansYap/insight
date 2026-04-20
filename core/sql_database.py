@@ -44,6 +44,19 @@ class EventDatabase:
                     context_json TEXT
                 )
             """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS motion_stats (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp     REAL NOT NULL,
+                    event_type    TEXT NOT NULL,
+                    mean_magnitude  REAL,
+                    std_magnitude   REAL,
+                    directionality  REAL,
+                    coverage_ratio  REAL,
+                    dominant_sin    REAL,
+                    dominant_cos    REAL  
+                )      
+            """)
         logger.info(f"Database ready at {self.db_path}")
 
     def log_detection(self, detection: dict):
@@ -81,6 +94,25 @@ class EventDatabase:
             self.conn.execute(
                 "INSERT INTO system_stats (fps, process_ram_mb, system_ram_pct) VALUES (?, ?, ?)",
                 (fps, process_ram_mb, system_ram_pct)
+            )
+    
+    def log_motion_stats(self, event: dict, stats: dict) -> None:
+        with self.conn:
+            self.conn.execute(
+                """INSERT INTO motion_stats
+                (timestamp, event_type, mean_magnitude, std_magnitude,
+                    directionality, coverage_ratio, dominant_sin, dominant_cos)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    time.time(),
+                    event["type"],
+                    stats["mean_magnitude"],
+                    stats["std_magnitude"],
+                    stats["directionality"],
+                    stats["coverage_ratio"],
+                    stats["dominant_sin"],
+                    stats["dominant_cos"],
+                )
             )
 
     def __del__(self):

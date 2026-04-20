@@ -275,6 +275,15 @@ def farneback_calculate(frames: list) -> dict | None:
         "dominant_cos": dominant_cos,
     }
 
+    logger.debug(
+                f"[V_MOTION] mean_magnitude ({mean_magnitude:.2f}),"
+                f"[V_MOTION] std_magnitude ({std_magnitude:.2f}),"
+                f"[V_MOTION] directionality ({circular_variance:.2f}),"
+                f"[V_MOTION] coverage_ratio ({coverage_ratio:.2f}),"
+                f"[V_MOTION] dominant_sin ({dominant_sin:.2f}),"
+                f"[V_MOTION] dominant_cos ({dominant_cos:.2f}),"
+            )
+
     return v_motion
 
 
@@ -356,7 +365,9 @@ def run(source=None, loop=False) -> None:
                 db.log_room_event(event)
                 dispatch.mark_entry_exit_trigger()
                 dispatch.dispatch(event, latest_frame)
-                farneback_calculate(list(frame_buffer))
+                motion_stats = farneback_calculate(list(frame_buffer))
+                if motion_stats:
+                    db.log_motion_stats(event, motion_stats)
                 motion.seed(small_frame)
 
             # --- Motion delta while occupied ---------------------------------
@@ -366,7 +377,10 @@ def run(source=None, loop=False) -> None:
                     activity_event = {"type": "activity_change", "timestamp": time.time()}
                     dispatch.mark_motion_trigger()
                     dispatch.dispatch(activity_event, latest_frame)
-                    farneback_calculate(list(frame_buffer))
+                    motion_stats = farneback_calculate(list(frame_buffer))
+                    if motion_stats:
+                        db.log_motion_stats(activity_event, motion_stats)
+
 
             # --- Room empty --------------------------------------------------
             else:
