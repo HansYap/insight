@@ -240,10 +240,10 @@ def farneback_calculate(frames: list) -> dict | None:
     COVERAGE_THRESHOLD = 0.5
 
     for f in range(1, len(frames)):
-        prev_frame = cv.cvtColor(frames[f-1], cv.COLOR_BGR2GRAY)
-        next_frame = cv.cvtColor(frames[f], cv.COLOR_BGR2GRAY)
+        prev_frame = cv2.cvtColor(frames[f-1], cv2.COLOR_BGR2GRAY)
+        next_frame = cv2.cvtColor(frames[f], cv2.COLOR_BGR2GRAY)
 
-        flow = cv.calcOpticalFlowFarneback(prev_frame, next_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)  
+        flow = cv2.calcOpticalFlowFarneback(prev_frame, next_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)  
         flow_store.append(flow)
     
     avg_flow = np.mean(flow_store, axis=0) # (H,W,2)
