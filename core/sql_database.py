@@ -1,6 +1,8 @@
 import sqlite3
 from pathlib import Path
 from loguru import logger
+import json
+import datetime
 
 class EventDatabase:
     def __init__(self, db_path: str):
@@ -74,8 +76,6 @@ class EventDatabase:
     
     def log_room_event(self, event: dict):
         """Logs transitions: person_entered, person_left"""
-        import json
-        import datetime
         with self.conn:
             self.conn.execute(
                 """INSERT INTO room_events 
@@ -104,7 +104,7 @@ class EventDatabase:
                     directionality, coverage_ratio, dominant_sin, dominant_cos)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    time.time(),
+                    datetime.datetime.now().isoformat(),,
                     event["type"],
                     stats["mean_magnitude"],
                     stats["std_magnitude"],
