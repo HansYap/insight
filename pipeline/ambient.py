@@ -258,12 +258,23 @@ def farneback_calculate(frames: list) -> dict | None:
     std_magnitude = np.std(magnitude_pixel)
 
     # calculate directionality
-    angle_pixel = np.arctan2(dy, dx)
-    circular_variance = 1 - np.abs(np.mean(np.exp(1j * angle_pixel)))
+    mask = magnitude_pixel > COVERAGE_THRESHOLD
 
+    if np.sum(mask) > 0:
+        angles = np.arctan2(dy[mask], dx[mask])
+
+        circular_variance = 1 - np.abs(np.mean(np.exp(1j * angles)))
+
+        dominant_angle = np.arctan2(
+            np.mean(np.sin(angles)),
+            np.mean(np.cos(angles))
+        )
+    else:
+        circular_variance = 1.0
+        dominant_angle = 0.0
+    
     coverage_ratio = np.mean(magnitude_pixel > COVERAGE_THRESHOLD)
 
-    dominant_angle = np.arctan2(np.mean(np.sin(angle_pixel)), np.mean(np.cos(angle_pixel)))
     dominant_sin = np.sin(dominant_angle)
     dominant_cos = np.cos(dominant_angle)
 
