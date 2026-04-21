@@ -104,7 +104,7 @@ class EventDatabase:
                     directionality, coverage_ratio, dominant_sin, dominant_cos)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    datetime.datetime.now().isoformat(),,
+                    datetime.datetime.now().isoformat(),
                     event["type"],
                     stats["mean_magnitude"],
                     stats["std_magnitude"],
