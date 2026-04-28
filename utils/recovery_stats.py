@@ -33,3 +33,18 @@ for row in rows:
 
 df_fix = pd.DataFrame(recovered)
 print(df_fix.describe())
+
+
+
+for row in recovered:
+    conn.execute(
+        """UPDATE motion_stats 
+           SET mean_magnitude=?, std_magnitude=?, dominant_sin=?, dominant_cos=?
+           WHERE id=?""",
+        (row["mean_magnitude"], row["std_magnitude"], 
+         row["dominant_sin"], row["dominant_cos"], row["id"])
+    )
+
+conn.commit()
+conn.close()
+print("Done")
