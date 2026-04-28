@@ -1,0 +1,19 @@
+normalization:
+  mean_magnitude:
+    mean: 0.256454
+    std:  0.411448
+  std_magnitude:
+    mean: 0.566662
+    std:  0.708722
+  directionality:
+    mean: 0.415444
+    std:  0.233857
+  coverage_ratio:
+    mean: 0.090874
+    std:  0.110775
+  dominant_sin:
+    mean: 0.022635
+    std:  0.679354
+  dominant_cos:
+    mean: -0.032344
+    std:  0.732965
