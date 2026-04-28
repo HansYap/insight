@@ -106,12 +106,12 @@ class EventDatabase:
                 (
                     datetime.datetime.now().isoformat(),
                     event["type"],
-                    stats["mean_magnitude"],
-                    stats["std_magnitude"],
-                    stats["directionality"],
-                    stats["coverage_ratio"],
-                    stats["dominant_sin"],
-                    stats["dominant_cos"],
+                    float(stats["mean_magnitude"]),
+                    float(stats["std_magnitude"]),
+                    float(stats["directionality"]),
+                    float(stats["coverage_ratio"]),
+                    float(stats["dominant_sin"]),
+                    float(stats["dominant_cos"]),
                 )
             )
 
