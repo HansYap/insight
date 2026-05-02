@@ -7,10 +7,18 @@ from loguru import logger
 
 THINKPAD_URL = "http://192.168.68.109:8000"
 
-def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>"):
+def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>", v_motion: dict | None = None):
     _, jpeg_bytes = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
     
     data = {"prompt": prompt}
+
+    if v_motion is not None:
+        data["mean_magnitude"]  = v_motion["mean_magnitude"]
+        data["std_magnitude"]   = v_motion["std_magnitude"]
+        data["directionality"]  = v_motion["directionality"]
+        data["coverage_ratio"]  = v_motion["coverage_ratio"]
+        data["dominant_sin"]    = v_motion["dominant_sin"]
+        data["dominant_cos"]    = v_motion["dominant_cos"]
 
     try:
         response = requests.post(

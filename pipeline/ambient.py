@@ -157,11 +157,11 @@ class EventDispatcher:
 
     # Public interface -------------------------------------------------------
 
-    def dispatch(self, event: dict, latest_frame: dict) -> None:
+    def dispatch(self, event: dict, latest_frame: dict, v_motion: dict | None = None) -> None:
         """Fire-and-forget: spawns a daemon thread per event."""
         threading.Thread(
             target=self._handle_event,
-            args=(event, latest_frame),
+            args=(event, latest_frame, v_motion),
             daemon=True,
         ).start()
 
@@ -179,7 +179,7 @@ class EventDispatcher:
 
     # Private — runs in background thread ------------------------------------
 
-    def _handle_event(self, event: dict, latest_frame: dict) -> None:
+    def _handle_event(self, event: dict, latest_frame: dict, v_motion: dict | None = None) -> None:
         logger.info(f"[FLORENCE] Querying for event: {event['type']}")
 
         if event["type"] == "person_entered":
@@ -190,7 +190,7 @@ class EventDispatcher:
             return
 
         self._save_trigger_frame(frame, event)
-        self._query_florence(frame, event)
+        self._query_florence(frame, event, v_motion)
 
     def _save_trigger_frame(self, frame, event: dict) -> None:
         timestamp = int(event["timestamp"])
@@ -200,8 +200,8 @@ class EventDispatcher:
             daemon=True,
         ).start()
 
-    def _query_florence(self, frame, event: dict) -> None:
-        result = send_frame_for_description(frame)
+    def _query_florence(self, frame, event: dict, v_motion: dict | None = None) -> None:
+        result = send_frame_for_description(frame, v_motion=v_motion)
 
         if "error" in result:
             logger.warning(f"[FLORENCE] Failed: {result['error']}")
@@ -376,10 +376,10 @@ def run(source=None, loop=False) -> None:
             if event:
                 db.log_room_event(event)
                 dispatch.mark_entry_exit_trigger()
-                dispatch.dispatch(event, latest_frame)
                 motion_stats = farneback_calculate(list(frame_buffer))
                 if motion_stats:
                     db.log_motion_stats(event, motion_stats)
+                dispatch.dispatch(event, latest_frame, v_motion=motion_stats)
                 motion.seed(small_frame)
 
             # --- Motion delta while occupied ---------------------------------
@@ -388,10 +388,10 @@ def run(source=None, loop=False) -> None:
                 if triggered:
                     activity_event = {"type": "activity_change", "timestamp": time.time()}
                     dispatch.mark_motion_trigger()
-                    dispatch.dispatch(activity_event, latest_frame)
                     motion_stats = farneback_calculate(list(frame_buffer))
                     if motion_stats:
                         db.log_motion_stats(activity_event, motion_stats)
+                    dispatch.dispatch(activity_event, latest_frame, v_motion=motion_stats)
 
 
             # --- Room empty --------------------------------------------------
