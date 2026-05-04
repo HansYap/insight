@@ -20,7 +20,7 @@ class SceneMemory:
     def embed(self, text: str) -> list:
         return self.embedder.encode(text).tolist()
 
-    def query(self, description: str) -> dict:
+    def query(self, description: str, v_motion: np.ndarray | None = None) -> dict:
         """
         Query using raw description only.
         Scene is unknown at query time — the human labels it afterward.
@@ -28,10 +28,12 @@ class SceneMemory:
         if self.collection.count() == 0:
             return {"confident": False, "label": None, "score": 0.0}
 
-        embedding = self.embed(description)  # raw description, no enrichment
+        # TODO ==== Improve weighting and add error checks
+        v_vision = np.array(self.embed(description))  # raw description, no enrichment
+        v_final = np.concatenate([v_vision, 8.0 * v_motion]) if v_motion is not None else np.concatenate([v_vision, np.zeros(6)])
 
         results = self.collection.query(
-            query_embeddings=[embedding],
+            query_embeddings=[v_final.tolist()],
             n_results=1,
             include=["documents", "metadatas", "distances"]
         )
@@ -57,12 +59,15 @@ class SceneMemory:
             activity = parts[0]
             subject = parts[1] if len(parts) > 1 else ""
 
-        embedding = self.embed(description)
+        # TODO ==== Improve weighting and add error checks
+        v_vision = np.array(self.embed(description))
+        v_final = np.concatenate([v_vision, 8.0 * v_motion]) if v_motion is not None else np.concatenate([v_vision, np.zeros(6)])
+        
         doc_id = f"scene_{int(time.time() * 1000)}"
 
         self.collection.add(
             ids=[doc_id],
-            embeddings=[embedding],
+            embeddings=[v_final.tolist()],
             documents=[description],
             metadatas=[{
                 "label": label,

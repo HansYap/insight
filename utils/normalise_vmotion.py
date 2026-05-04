@@ -1,10 +1,10 @@
-def normalize_vmotion(stats: dict, norm_config: dict) -> dict:
-    normalized = {}
-    for key, value in stats.items():
-        mean = norm_config[key]["mean"]
-        std  = norm_config[key]["std"]
-        normalized[key] = (value - mean) / std if std > 0 else 0.0
-    return normalized
+def normalize_vmotion(stats: dict, norm_config: dict) -> np.ndarray:
+    keys = ["mean_magnitude", "std_magnitude", "directionality",
+            "coverage_ratio", "dominant_sin", "dominant_cos"]
+    return np.array([
+        (stats[k] - norm_config[k]["mean"]) / norm_config[k]["std"]
+        for k in keys
+    ])
 
 
 """

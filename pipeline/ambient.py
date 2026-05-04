@@ -213,6 +213,7 @@ class EventDispatcher:
         score       = result.get("score", 0.0)
 
         if confident:
+            # TODO ===== add saving data ==== do not touch YET
             logger.info(f"[INSIGHT] {label} (confidence: {score})")
             self._state.last_confident_at = time.time()
         else:

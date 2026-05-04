@@ -12,7 +12,12 @@ from pathlib import Path
 import base64
 import numpy as np
 import cv2
+import yaml
 
+
+def load_config(path="config/vmotion_norm.yaml") -> dict:
+    with open(path) as f:
+        return yaml.safe_load(f)["normalization"]
 
 app = FastAPI()
 inferencer = FlorenceInferencer() 
@@ -23,6 +28,7 @@ PENDING_DIR.mkdir(exist_ok=True)
 FRAMES_DIR = PENDING_DIR / "frames"
 FRAMES_DIR.mkdir(exist_ok=True)
 QUEUE_FILE = PENDING_DIR / "queue.json"
+NORM_CONFIG = load_config()
 
 app.mount("/frames", StaticFiles(directory=str(FRAMES_DIR)), name="frames")
 
@@ -39,18 +45,38 @@ def save_queue(queue: list):
 async def describe_frame(
     frame: UploadFile = File(...),
     prompt: str = Form(default="<MORE_DETAILED_CAPTION>"),
+    mean_magnitude: float = Form(default=None),
+    std_magnitude:  float = Form(default=None),
+    directionality: float = Form(default=None),
+    coverage_ratio: float = Form(default=None),
+    dominant_sin:   float = Form(default=None),
+    dominant_cos:   float = Form(default=None),
 ):
     image_bytes = await frame.read()
     result = inferencer.describe(image_bytes, prompt)
     description = result["description"]
 
-    match = memory.query(description)
+    v_motion_norm = None
+    if mean_magnitude is not None:
+        raw = {
+            "mean_magnitude": mean_magnitude,
+            "std_magnitude":  std_magnitude,
+            "directionality": directionality,
+            "coverage_ratio": coverage_ratio,
+            "dominant_sin":   dominant_sin,
+            "dominant_cos":   dominant_cos,
+        }
+        v_motion_norm = normalize_vmotion(raw, norm_config)
+    
+    match = memory.query(description, v_motion=v_motion_norm)
+
 
     return {
         "description": description,
         "confident": match["confident"],
         "label": match["label"],
         "score": match["score"],
+        "v_motion":    v_motion_norm.tolist() if v_motion_norm is not None else None,
     }
 
 @app.post("/queue-pending")
@@ -59,6 +85,7 @@ async def queue_pending(
     description: str = Form(...),
     event_type: str = Form(...),
     score: float = Form(...),
+    v_motion: str = Form(default=None),
 ):
     item_id = str(uuid.uuid4())
     frame_filename = f"{item_id}.jpg"
@@ -72,7 +99,8 @@ async def queue_pending(
         "description": description,
         "score": score,
         "frame_url": f"/frames/{frame_filename}",
-        "timestamp": __import__("time").time()
+        "timestamp": __import__("time").time(),
+        "v_motion": json.loads(v_motion) if v_motion else None,
     })
     save_queue(queue)
     return {"queued": True, "id": item_id, "total_pending": len(queue)}
@@ -90,8 +118,14 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
 
     if not item:
         return {"error": "Item not found"}
+    
+    v_motion_norm = None
+    if item.get("v_motion"):
+        v_motion_norm = np.array(list(item["v_motion"].values()))
 
-    used_label = memory.store(item["description"], activity, subject)
+    ## TODO ==== Store subsequent activities even if no longer need to label
+
+    used_label = memory.store(item["description"], activity, subject, v_motion=v_motion_norm)
 
     queue = [i for i in queue if i["id"] != item_id]
     save_queue(queue)
