@@ -61,6 +61,7 @@ class EventDatabase:
             """)
         logger.info(f"Database ready at {self.db_path}")
 
+    # YOLO detections
     def log_detection(self, detection: dict):
         b = detection["bbox"]
         try:
@@ -74,6 +75,7 @@ class EventDatabase:
         except Exception as e:
             logger.error(f"Failed to log detection: {e}")
     
+    # event logs 
     def log_room_event(self, event: dict):
         """Logs transitions: person_entered, person_left"""
         with self.conn:
@@ -89,6 +91,7 @@ class EventDatabase:
                 )
             )
 
+    # log system stats
     def log_stats(self, fps: float, process_ram_mb: float, system_ram_pct: float):
         with self.conn:
             self.conn.execute(
@@ -96,6 +99,7 @@ class EventDatabase:
                 (fps, process_ram_mb, system_ram_pct)
             )
     
+    # motion stats
     def log_motion_stats(self, event: dict, stats: dict) -> None:
         with self.conn:
             self.conn.execute(

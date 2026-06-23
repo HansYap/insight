@@ -66,7 +66,7 @@ async def describe_frame(
             "dominant_sin":   dominant_sin,
             "dominant_cos":   dominant_cos,
         }
-        v_motion_norm = normalize_vmotion(raw, norm_config)
+        v_motion_norm = normalize_vmotion(raw, NORM_CONFIG)
     
     match = memory.query(description, v_motion=v_motion_norm)
 
@@ -76,7 +76,7 @@ async def describe_frame(
         "confident": match["confident"],
         "label": match["label"],
         "score": match["score"],
-        "v_motion":    v_motion_norm.tolist() if v_motion_norm is not None else None,
+        "v_motion": v_motion_norm.tolist() if v_motion_norm is not None else None,
     }
 
 @app.post("/queue-pending")
@@ -121,7 +121,7 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
     
     v_motion_norm = None
     if item.get("v_motion"):
-        v_motion_norm = np.array(list(item["v_motion"].values()))
+        v_motion_norm = np.array(item["v_motion"])
 
     ## TODO ==== Store subsequent activities even if no longer need to label
 

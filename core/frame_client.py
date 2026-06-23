@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 import base64
 from loguru import logger
+import json
 
 THINKPAD_URL = "http://192.168.68.109:8000"
 
@@ -33,13 +34,13 @@ def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>", v_mo
     except requests.exceptions.Timeout:
         return {"error": "Florence-2 inference timed out"}
 
-
-def queue_pending(frame, description: str, event_type: str, score: float):
+def queue_pending(frame, description: str, event_type: str, score: float, v_motion: np.ndarray | None = None):
     _, jpeg_bytes = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
     data = {
         "description": description,
         "event_type": event_type,
         "score": score,
+        "v_motion": json.dumps(v_motion) if v_motion is not None else None,
     }
     try:
         response = requests.post(

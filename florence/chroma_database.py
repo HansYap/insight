@@ -17,8 +17,15 @@ class SceneMemory:
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
         print("Memory ready.")
 
+
     def embed(self, text: str) -> list:
         return self.embedder.encode(text).tolist()
+
+
+    def build_vector(self, v_vision: np.ndarray, v_motion: np.ndarray | None = None) -> np.ndarray:
+        motion = v_motion if v_motion is not None else np.zeros(6)
+        return np.concatenate([v_vision, 8.0 * motion]) 
+
 
     def query(self, description: str, v_motion: np.ndarray | None = None) -> dict:
         """
@@ -30,7 +37,7 @@ class SceneMemory:
 
         # TODO ==== Improve weighting and add error checks
         v_vision = np.array(self.embed(description))  # raw description, no enrichment
-        v_final = np.concatenate([v_vision, 8.0 * v_motion]) if v_motion is not None else np.concatenate([v_vision, np.zeros(6)])
+        v_final = build_vector(v_vision, v_motion)
 
         results = self.collection.query(
             query_embeddings=[v_final.tolist()],
@@ -61,7 +68,7 @@ class SceneMemory:
 
         # TODO ==== Improve weighting and add error checks
         v_vision = np.array(self.embed(description))
-        v_final = np.concatenate([v_vision, 8.0 * v_motion]) if v_motion is not None else np.concatenate([v_vision, np.zeros(6)])
+        v_final = build_vector(v_vision, v_motion)
         
         doc_id = f"scene_{int(time.time() * 1000)}"
 
