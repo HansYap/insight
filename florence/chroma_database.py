@@ -49,7 +49,7 @@ class SceneMemory:
             "nearest_description": results["documents"][0][0]
         }
 
-    def store(self, description: str, activity: str, subject: str = "") -> str:
+    def store(self, description: str, activity: str, subject: str = "", v_motion: np.ndarray | None = None) -> str:
         label = f"{activity} {subject}".strip()
 
         existing_label = self.find_similar_label(label)
