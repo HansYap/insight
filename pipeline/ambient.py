@@ -169,6 +169,8 @@ class EventDispatcher:
         now = time.time()
         if now - self._state.last_confident_at < self.config.confident_cooldown_sec:
             return False
+        if (now - self._state.last_trigger_at) < self.config.motion_cooldown_sec: 
+            return False
         return (now - self._state.last_motion_trigger_at) >= self.config.motion_cooldown_sec
 
     def mark_entry_exit_trigger(self) -> None:
@@ -212,7 +214,6 @@ class EventDispatcher:
         label = result.get("label", "")
         score = result.get("score", 0.0)
         v_motion_norm = result.get("v_motion", None)
-        print(f"QUERY-FLORENCE========={v_motion_norm}")
 
         if confident:
             # TODO ===== add saving data ==== do not touch YET

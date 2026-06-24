@@ -93,7 +93,7 @@ async def queue_pending(
     (FRAMES_DIR / frame_filename).write_bytes(frame_bytes)
 
     queue = load_queue()
-    print(f"QUEUE_PENDING APIIIIIIIIII========={json.loads(v_motion)}")
+
     queue.append({
         "id": item_id,
         "event_type": event_type,
@@ -125,7 +125,7 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
         v_motion_norm = np.array(item["v_motion"])
 
     ## TODO ==== Store subsequent activities even if no longer need to label
-    print(f"LABEL ITEM VMOTION======{v_motion_norm}")
+   
     used_label = memory.store(item["description"], activity, subject, v_motion=v_motion_norm)
 
     queue = [i for i in queue if i["id"] != item_id]

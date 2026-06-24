@@ -23,6 +23,8 @@ class SceneMemory:
 
 
     def build_vector(self, v_vision: np.ndarray, v_motion: np.ndarray | None = None) -> np.ndarray:
+        print("vision:", v_vision.shape)
+        print("motion:", v_motion.shape)
         motion = v_motion if v_motion is not None else np.zeros(6)
         return np.concatenate([v_vision, 8.0 * motion]) 
 
@@ -37,7 +39,7 @@ class SceneMemory:
 
         # TODO ==== Improve weighting and add error checks
         v_vision = np.array(self.embed(description))  # raw description, no enrichment
-        v_final = build_vector(v_vision, v_motion)
+        v_final = self.build_vector(v_vision, v_motion)
 
         results = self.collection.query(
             query_embeddings=[v_final.tolist()],
@@ -68,7 +70,7 @@ class SceneMemory:
 
         # TODO ==== Improve weighting and add error checks
         v_vision = np.array(self.embed(description))
-        v_final = build_vector(v_vision, v_motion)
+        v_final = self.build_vector(v_vision, v_motion)
         
         doc_id = f"scene_{int(time.time() * 1000)}"
 
