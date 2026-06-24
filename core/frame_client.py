@@ -5,6 +5,7 @@ from datetime import datetime
 import base64
 from loguru import logger
 import json
+import numpy as np
 
 THINKPAD_URL = "http://192.168.68.109:8000"
 

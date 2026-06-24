@@ -1,3 +1,5 @@
+import numpy as np
+
 def normalize_vmotion(stats: dict, norm_config: dict) -> np.ndarray:
     keys = ["mean_magnitude", "std_magnitude", "directionality",
             "coverage_ratio", "dominant_sin", "dominant_cos"]

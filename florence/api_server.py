@@ -1,8 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from florence_model import FlorenceInferencer
-from chroma_database import SceneMemory
+from .florence_model import FlorenceInferencer
+from .chroma_database import SceneMemory
 from utils.normalise_vmotion import normalize_vmotion
 import uvicorn
 import json
