@@ -6,7 +6,7 @@ import numpy as np
 
 CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
 COLLECTION_NAME = "insight_scenes"
-CONFIDENCE_THRESHOLD = 0.80
+CONFIDENCE_THRESHOLD = 0.92
 
 class SceneMemory:
     def __init__(self):

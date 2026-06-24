@@ -33,7 +33,7 @@ def load_config(path="config/settings.yaml") -> dict:
 
 @dataclass
 class MotionConfig:
-    threshold: int   = 500_000  # lower = more sensitive (320×240 frame)
+    threshold: int   = 1_500_000  # lower = more sensitive (320×240 frame)
     reference_update_secs: int = 5
 
 
