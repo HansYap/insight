@@ -4,6 +4,7 @@ from loguru import logger
 import json
 import datetime
 import numpy as np
+import time
 
 class EventDatabase:
     def __init__(self, db_path: str):
