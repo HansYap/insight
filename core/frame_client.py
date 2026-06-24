@@ -36,6 +36,7 @@ def send_frame_for_description(frame_bgr, prompt="<MORE_DETAILED_CAPTION>", v_mo
 
 def queue_pending(frame, description: str, event_type: str, score: float, v_motion: np.ndarray | None = None):
     _, jpeg_bytes = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    print(f"QUEUE_PENDING FRAME CLIENT========={json.dumps(v_motion)}")
     data = {
         "description": description,
         "event_type": event_type,

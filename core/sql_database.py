@@ -3,6 +3,7 @@ from pathlib import Path
 from loguru import logger
 import json
 import datetime
+import numpy as np
 
 class EventDatabase:
     def __init__(self, db_path: str):
@@ -59,6 +60,16 @@ class EventDatabase:
                     dominant_cos    REAL  
                 )      
             """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS training_data (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp     REAL NOT NULL,
+                    source        TEXT NOT NULL,
+                    score         REAL NOT NULL,
+                    embedding     BLOB NOT NULL,
+                    label         TEXT NOT NULL
+                )      
+            """)
         logger.info(f"Database ready at {self.db_path}")
 
     # YOLO detections
@@ -108,7 +119,7 @@ class EventDatabase:
                     directionality, coverage_ratio, dominant_sin, dominant_cos)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    datetime.datetime.now().isoformat(),
+                    time.time(),
                     event["type"],
                     float(stats["mean_magnitude"]),
                     float(stats["std_magnitude"]),
@@ -116,6 +127,21 @@ class EventDatabase:
                     float(stats["coverage_ratio"]),
                     float(stats["dominant_sin"]),
                     float(stats["dominant_cos"]),
+                )
+            )
+    
+    def log_training_data(self, source: str, score: float, embedding: np.ndarray, label: str,) -> None:
+        with self.conn:
+            self.conn.execute(
+                """INSERT INTO training_data
+                (timestamp, source, score, embedding, label)
+                VALUES (?, ?, ?, ?, ?)""",
+                (
+                    time.time(),
+                    source,
+                    score,
+                    embedding.astype(np.float32).tobytes(),
+                    label,
                 )
             )
 

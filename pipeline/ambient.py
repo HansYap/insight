@@ -212,6 +212,7 @@ class EventDispatcher:
         label = result.get("label", "")
         score = result.get("score", 0.0)
         v_motion_norm = result.get("v_motion", None)
+        print(f"QUERY-FLORENCE========={v_motion_norm}")
 
         if confident:
             # TODO ===== add saving data ==== do not touch YET
