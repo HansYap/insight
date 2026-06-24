@@ -101,7 +101,7 @@ async def queue_pending(
         "score": score,
         "frame_url": f"/frames/{frame_filename}",
         "timestamp": __import__("time").time(),
-        "v_motion": json.loads(v_motion) if v_motion else None,
+        "v_motion": json.loads(v_motion),
     })
     save_queue(queue)
     return {"queued": True, "id": item_id, "total_pending": len(queue)}
