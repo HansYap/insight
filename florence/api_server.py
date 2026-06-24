@@ -120,9 +120,8 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
     if not item:
         return {"error": "Item not found"}
     
-    v_motion_norm = None
-    if item.get("v_motion"):
-        v_motion_norm = np.array(item["v_motion"])
+    v_motion_raw = item.get("v_motion")
+    v_motion_norm = np.array(v_motion_raw) if v_motion_raw is not None else np.zeros(6)
 
     ## TODO ==== Store subsequent activities even if no longer need to label
    
