@@ -28,6 +28,9 @@ class SceneMemory:
         motion = v_motion if v_motion is not None else np.zeros(6)
         return np.concatenate([v_vision, 8.0 * motion]) 
 
+    def cosine_similarity(a: np.ndarray, b: np.ndarray):
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
 
     def query(self, description: str, v_motion: np.ndarray | None = None) -> dict:
         """
@@ -59,7 +62,7 @@ class SceneMemory:
             "embedding": v_final,
         }
 
-    def store(self, description: str, activity: str, subject: str = "", v_motion: np.ndarray | None = None) -> str:
+    def store(self, description: str, activity: str, subject: str, v_final: list[float]) -> str:
         label = f"{activity} {subject}".strip()
 
         existing_label = self.find_similar_label(label)
@@ -69,15 +72,11 @@ class SceneMemory:
             activity = parts[0]
             subject = parts[1] if len(parts) > 1 else ""
 
-        # TODO ==== Improve weighting and add error checks
-        v_vision = np.array(self.embed(description))
-        v_final = self.build_vector(v_vision, v_motion)
-        
         doc_id = f"scene_{int(time.time() * 1000)}"
 
         self.collection.add(
             ids=[doc_id],
-            embeddings=[v_final.tolist()],
+            embeddings=[v_final],
             documents=[description],
             metadatas=[{
                 "label": label,

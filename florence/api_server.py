@@ -127,13 +127,30 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
     if not item:
         return {"error": "Item not found"}
     
-    v_motion_raw = item.get("v_motion")
-    v_motion_norm = np.array(v_motion_raw) if v_motion_raw is not None else np.zeros(6)
+    v_final = item.get("embedding")
+    
+    used_label = memory.store(item["description"], activity, subject, v_final=v_final)
 
-    ## TODO ==== Store subsequent activities even if no longer need to label
-   
-    used_label = memory.store(item["description"], activity, subject, v_motion=v_motion_norm)
+    item_embed = np.array(v_final, dtype=np.float32)
+    other_embeds = [
+        np.array(i["embedding"], dtype=np.float32)
+        for i in queue
+        if i["id"] != item_id
+    ]
 
+    similarity_threshold = 0.9
+
+    for embed in other_embeds:
+        cosine_score = memory.cosine_similarity(item_embed, embed)
+        
+        # propagated sweep logged
+        if cosine_score >= 0.9:
+            training_db.log_training_data("propagated", cosine_score, embed, f"{activity} {subject}".strip())
+
+    # log user labeled item
+    training_db.log_training_data("user", item["score"], v_final, f"{activity} {subject}".strip())
+
+    #TODO ======  convert to dictionary for O(1) instead of O(n)
     queue = [i for i in queue if i["id"] != item_id]
     save_queue(queue)
     frame_path = FRAMES_DIR / f"{item_id}.jpg"
@@ -179,7 +196,6 @@ async def save_frame(request: Request):
     rel_path = body["path"]          # e.g. "motion/TRIGGER_0001.jpg"
     img_b64  = body["image"]
 
-    import base64, numpy as np
     img_bytes = base64.b64decode(img_b64)
     img_array = np.frombuffer(img_bytes, dtype=np.uint8)
     frame     = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
