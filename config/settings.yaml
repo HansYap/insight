@@ -27,10 +27,6 @@ models:
     load_on_demand: true
     unload_after_seconds: 30
 
-  sam2:
-    path: "models/sam2"
-    enabled: false             # Phase 3
-    load_on_demand: true
 
 detection:
   trigger_classes:             # Only these trigger Florence-2 later
@@ -47,6 +43,9 @@ database:
   path: "data/insight.db"
   log_detections: true
   log_fps_interval: 60         # Log system stats every 60s
+
+training_database:
+  path: "data/training.db"
 
 scene:
   active: "bedroom"

@@ -313,9 +313,9 @@ def run(source=None, loop=False) -> None:
 
     video_source = source if source is not None else cam_cfg["source"]
 
-    detector      = ObjectDetector(config["models"]["yolo"])
+    detector = ObjectDetector(config["models"]["yolo"])
     detector.load()
-    db            = EventDatabase(config["database"]["path"])
+    db = EventDatabase(config["database"]["path"])
     # for debug purpose
     fps_counter   = FPSCounter(window=30)
     mem_monitor   = MemoryMonitor()

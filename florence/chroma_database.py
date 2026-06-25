@@ -6,7 +6,7 @@ import numpy as np
 
 CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
 COLLECTION_NAME = "insight_scenes"
-CONFIDENCE_THRESHOLD = 0.92
+CONFIDENCE_THRESHOLD = 0.9
 
 class SceneMemory:
     def __init__(self):
@@ -55,7 +55,8 @@ class SceneMemory:
             "confident": score >= CONFIDENCE_THRESHOLD,
             "label": label,
             "score": round(score, 3),
-            "nearest_description": results["documents"][0][0]
+            "nearest_description": results["documents"][0][0],
+            "embedding": v_final,
         }
 
     def store(self, description: str, activity: str, subject: str = "", v_motion: np.ndarray | None = None) -> str:

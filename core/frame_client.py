@@ -42,7 +42,7 @@ def queue_pending(frame, description: str, event_type: str, score: float, v_moti
         "description": description,
         "event_type": event_type,
         "score": score,
-        "v_motion": json.dumps(v_motion) if v_motion is not None else np.zeros(6),
+        "v_motion": json.dumps(v_motion if v_motion is not None else [0.0] * 6),
     }
     try:
         response = requests.post(

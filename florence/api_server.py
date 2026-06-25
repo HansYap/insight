@@ -22,6 +22,7 @@ def load_config(path="config/vmotion_norm.yaml") -> dict:
 app = FastAPI()
 inferencer = FlorenceInferencer() 
 memory = SceneMemory()
+training_db = TrainingDatabase(config["training_database"]["path"])
 
 PENDING_DIR = Path(__file__).parent.parent / "data" / "pending"
 PENDING_DIR.mkdir(exist_ok=True)
@@ -70,6 +71,8 @@ async def describe_frame(
     
     match = memory.query(description, v_motion=v_motion_norm)
 
+    if match["confident"] == True:
+        training_db.log_training_data("auto", match["score"], match["v_final"], match["label"])
 
     return {
         "description": description,
@@ -78,6 +81,7 @@ async def describe_frame(
         "score": match["score"],
         "v_motion": v_motion_norm.tolist() if v_motion_norm is not None else None,
     }
+
 
 @app.post("/queue-pending")
 async def queue_pending(
@@ -94,6 +98,9 @@ async def queue_pending(
 
     queue = load_queue()
 
+    v_vision = memory.embed(v_vision)
+    v_final = memory.build_vector(v_vision, v_motion)
+
     queue.append({
         "id": item_id,
         "event_type": event_type,
@@ -101,7 +108,7 @@ async def queue_pending(
         "score": score,
         "frame_url": f"/frames/{frame_filename}",
         "timestamp": __import__("time").time(),
-        "v_motion": json.loads(v_motion),
+        "embedding": v_final.tolist(),
     })
     save_queue(queue)
     return {"queued": True, "id": item_id, "total_pending": len(queue)}
