@@ -28,7 +28,7 @@ class SceneMemory:
         motion = v_motion if v_motion is not None else np.zeros(6)
         return np.concatenate([v_vision, 8.0 * motion]) 
 
-    def cosine_similarity(a: np.ndarray, b: np.ndarray):
+    def cosine_similarity(self, a: np.ndarray, b: np.ndarray):
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
@@ -41,7 +41,7 @@ class SceneMemory:
             return {"confident": False, "label": None, "score": 0.0}
 
         # TODO ==== Improve weighting and add error checks
-        v_vision = np.array(self.embed(description))  # raw description, no enrichment
+        v_vision = np.array(self.embed(description))  
         v_final = self.build_vector(v_vision, v_motion)
 
         results = self.collection.query(
@@ -59,7 +59,7 @@ class SceneMemory:
             "label": label,
             "score": round(score, 3),
             "nearest_description": results["documents"][0][0],
-            "embedding": v_final,
+            "v_final": v_final.tolist(),
         }
 
     def store(self, description: str, activity: str, subject: str, v_final: list[float]) -> str:
@@ -96,6 +96,15 @@ class SceneMemory:
 
         all_meta = self.collection.get(include=["metadatas"])["metadatas"]
         existing_labels = list({m["label"] for m in all_meta})
+
+        def norm(x):
+            return " ".join(x.lower().strip().split())
+        
+        candidate = norm(candidate)
+
+        for label in existing_labels:
+            if norm(label) == candidate_norm:
+                return label
 
         candidate_emb = self.embedder.encode(candidate)
         existing_embs = self.embedder.encode(existing_labels)
