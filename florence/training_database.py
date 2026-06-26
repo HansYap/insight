@@ -30,6 +30,9 @@ class TrainingDatabase:
 
     
     def log_training_data(self, source: str, score: float, embedding: np.ndarray, label: str,) -> None:
+        if isinstance(embedding, np.ndarray):
+            embedding = embedding.tolist()
+
         with self.conn:
             self.conn.execute(
                 """INSERT INTO training_data

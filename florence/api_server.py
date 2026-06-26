@@ -132,32 +132,41 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
     used_label = memory.store(item["description"], activity, subject, v_final=v_final)
 
     item_embed = np.array(v_final, dtype=np.float32)
-    other_embeds = [
-        np.array(i["embedding"], dtype=np.float32)
-        for i in queue
-        if i["id"] != item_id
-    ]
 
+    removed_items = {item_id}
+
+    true_label = f"{activity} {subject}".strip()
+    propagated_count = 0
     similarity_threshold = 0.9
 
-    for embed in other_embeds:
-        cosine_score = memory.cosine_similarity(item_embed, embed)
-        
+    for other_item in queue:
+        if other_item["id"] == item_id:
+            continue
+
+        other_embed = np.array(other_item["embedding"], dtype=np.float32)
+
+        cosine_score = memory.cosine_similarity(item_embed, other_embed)
+
         # propagated sweep logged
-        if cosine_score >= 0.9:
-            training_db.log_training_data("propagated", cosine_score, embed, f"{activity} {subject}".strip())
+        if cosine_score >= similarity_threshold:
+            training_db.log_training_data("propagated", cosine_score, other_embed.tolist(), true_label)
+            propagated_count += 1
+
+            removed_items.add(other_item["id"])
 
     # log user labeled item
-    training_db.log_training_data("user", item["score"], v_final, f"{activity} {subject}".strip())
+    training_db.log_training_data("user", item["score"], v_final, true_label)
 
-    #TODO ======  convert to dictionary for O(1) instead of O(n)
-    queue = [i for i in queue if i["id"] != item_id]
+    queue = [i for i in queue if i["id"] not in removed_items]
     save_queue(queue)
-    frame_path = FRAMES_DIR / f"{item_id}.jpg"
-    if frame_path.exists():
-        frame_path.unlink()
 
-    return {"labeled": True, "label": used_label, "remaining": len(queue)}
+    for removed_id in removed_items:
+        frame_path = FRAMES_DIR / f"{removed_id}.jpg"
+
+        if frame_path.exists():
+            frame_path.unlink()
+
+    return {"labeled": True, "label": used_label, "propagated": propagated_count, "remaining": len(queue)}
 
 # api_server.py
 @app.get("/labels")
