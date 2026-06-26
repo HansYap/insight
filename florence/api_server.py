@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from .florence_model import FlorenceInferencer
 from .chroma_database import SceneMemory
+from .training_database import TrainingDatabase
 from utils.normalise_vmotion import normalize_vmotion
 import uvicorn
 import json
@@ -14,22 +15,27 @@ import numpy as np
 import cv2
 import yaml
 
+def load_config(path="config/settings.yaml") -> dict:
+    with open(path) as f:
+        return yaml.safe_load(f)
 
-def load_config(path="config/vmotion_norm.yaml") -> dict:
+def load_motion_config(path="config/vmotion_norm.yaml") -> dict:
     with open(path) as f:
         return yaml.safe_load(f)["normalization"]
+
+DB_CONFIG = load_config()
 
 app = FastAPI()
 inferencer = FlorenceInferencer() 
 memory = SceneMemory()
-training_db = TrainingDatabase(config["training_database"]["path"])
+training_db = TrainingDatabase(DB_CONFIG["training_database"]["path"])
 
 PENDING_DIR = Path(__file__).parent.parent / "data" / "pending"
 PENDING_DIR.mkdir(exist_ok=True)
 FRAMES_DIR = PENDING_DIR / "frames"
 FRAMES_DIR.mkdir(exist_ok=True)
 QUEUE_FILE = PENDING_DIR / "queue.json"
-NORM_CONFIG = load_config()
+NORM_CONFIG = load_motion_config()
 
 app.mount("/frames", StaticFiles(directory=str(FRAMES_DIR)), name="frames")
 
@@ -100,6 +106,7 @@ async def queue_pending(
 
     v_vision = memory.embed(v_vision)
     v_final = memory.build_vector(v_vision, v_motion)
+    print(f"QUEUE-PENDING======={v_final}")
 
     queue.append({
         "id": item_id,
