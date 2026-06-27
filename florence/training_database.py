@@ -22,16 +22,14 @@ class TrainingDatabase:
                     timestamp     REAL NOT NULL,
                     source        TEXT NOT NULL,
                     score         REAL NOT NULL,
-                    embedding     TEXT NOT NULL,
+                    embedding     BLOB NOT NULL,
                     label         TEXT NOT NULL
                 )      
             """)
         logger.info(f"Database ready at {self.db_path}")
 
     
-    def log_training_data(self, source: str, score: float, embedding: np.ndarray, label: str,) -> None:
-        if isinstance(embedding, np.ndarray):
-            embedding = embedding.tolist()
+    def log_training_data(self, source: str, score: float, embedding: bytes, label: str,) -> None:
 
         with self.conn:
             self.conn.execute(

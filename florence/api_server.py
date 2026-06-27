@@ -103,8 +103,8 @@ async def queue_pending(
     (FRAMES_DIR / frame_filename).write_bytes(frame_bytes)
 
     queue = load_queue()
-
-    v_vision = memory.embed(v_vision)
+    
+    v_vision = memory.embed(description)
     v_final = memory.build_vector(v_vision, v_motion)
     print(f"QUEUE-PENDING======={v_final}")
 
@@ -142,7 +142,6 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
 
     removed_items = {item_id}
 
-    true_label = f"{activity} {subject}".strip()
     propagated_count = 0
     similarity_threshold = 0.9
 
@@ -156,13 +155,15 @@ async def label_item(item_id: str, activity: str = Form(...), subject: str = For
 
         # propagated sweep logged
         if cosine_score >= similarity_threshold:
-            training_db.log_training_data("propagated", cosine_score, other_embed.tolist(), true_label)
+            training_db.log_training_data("propagated", cosine_score, other_embed.tobytes(), used_label)
             propagated_count += 1
 
             removed_items.add(other_item["id"])
 
     # log user labeled item
-    training_db.log_training_data("user", item["score"], v_final, true_label)
+    embedding = np.array(v_final, dtype=np.float32)
+    embedding_blob = embedding.tobytes()
+    training_db.log_training_data("user", item["score"], embedding_blob, used_label)
 
     queue = [i for i in queue if i["id"] not in removed_items]
     save_queue(queue)

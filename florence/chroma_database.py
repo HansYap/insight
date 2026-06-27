@@ -3,6 +3,7 @@ from sentence_transformers import SentenceTransformer
 from pathlib import Path
 import time
 import numpy as np
+import json
 
 CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
 COLLECTION_NAME = "insight_scenes"
@@ -19,14 +20,20 @@ class SceneMemory:
 
 
     def embed(self, text: str) -> list:
-        return self.embedder.encode(text).tolist()
+        return self.embedder.encode(text)
 
 
-    def build_vector(self, v_vision: np.ndarray, v_motion: np.ndarray | None = None) -> np.ndarray:
-        print("vision:", v_vision.shape)
-        print("motion:", v_motion.shape)
-        motion = v_motion if v_motion is not None else np.zeros(6)
-        return np.concatenate([v_vision, 8.0 * motion]) 
+    def build_vector(self, v_vision, v_motion=None):
+        v_vision = np.asarray(v_vision, dtype=np.float32)
+
+        if isinstance(v_motion, str):
+            v_motion = np.array(json.loads(v_motion), dtype=np.float32)
+        elif v_motion is None:
+            v_motion = np.zeros(6, dtype=np.float32)
+        else:
+            v_motion = np.asarray(v_motion, dtype=np.float32)
+
+        return np.concatenate([v_vision, 8.0 * v_motion])
 
     def cosine_similarity(self, a: np.ndarray, b: np.ndarray):
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
@@ -41,7 +48,7 @@ class SceneMemory:
             return {"confident": False, "label": None, "score": 0.0}
 
         # TODO ==== Improve weighting and add error checks
-        v_vision = np.array(self.embed(description))  
+        v_vision = self.embed(description)  
         v_final = self.build_vector(v_vision, v_motion)
 
         results = self.collection.query(
@@ -59,11 +66,13 @@ class SceneMemory:
             "label": label,
             "score": round(score, 3),
             "nearest_description": results["documents"][0][0],
-            "v_final": v_final.tolist(),
+            "v_final": v_final.tobytes(),
         }
 
     def store(self, description: str, activity: str, subject: str, v_final: list[float]) -> str:
         label = f"{activity} {subject}".strip()
+
+        print(f"STOREEEE=========={v_final}")
 
         existing_label = self.find_similar_label(label)
         if existing_label:
@@ -103,7 +112,7 @@ class SceneMemory:
         candidate = norm(candidate)
 
         for label in existing_labels:
-            if norm(label) == candidate_norm:
+            if norm(label) == candidate:
                 return label
 
         candidate_emb = self.embedder.encode(candidate)
