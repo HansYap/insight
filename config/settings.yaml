@@ -23,10 +23,9 @@ models:
 
   florence2:
     path: "models/florence2"
-    enabled: false             # Phase 2
+    enabled: false             
     load_on_demand: true
     unload_after_seconds: 30
-
 
 detection:
   trigger_classes:             # Only these trigger Florence-2 later
@@ -37,7 +36,7 @@ detection:
     - laptop
     - phone
   min_confidence: 0.5
-  cooldown_seconds: 5          # Don't re-trigger within 5s of last event
+  cooldown_seconds: 5          # Dont re-trigger within 5s of last event
 
 database:
   path: "data/insight.db"
@@ -47,6 +46,6 @@ database:
 training_database:
   path: "data/training.db"
 
-scene:
-  active: "bedroom"
-  roi_enabled: false           # Region of interest masking — Phase 1.5
+# scene:
+#   active: "bedroom"
+#   roi_enabled: false          
